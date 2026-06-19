@@ -321,7 +321,7 @@ with t1:
         all_vals = {p: get_radar_vals(p) for p in active_players}
         # Min/max across all players for normalization
         norm_ranges = {}
-        for i, (label, _, _) in enumerate(list(radar_metrics.items())):
+        for i, label in enumerate(list(radar_metrics.keys())):
             all_v = [all_vals[p][i][1] for p in active_players]
             norm_ranges[i] = (min(all_v), max(all_v))
 
