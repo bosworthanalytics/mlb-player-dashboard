@@ -1,0 +1,43 @@
+Player,Season,Month,Month_Num,Period,xBA,xSLG,xwOBA,EV_avg,EV_max,LA_avg,Barrel_pct,HardHit_pct,BIP,Sprint_speed
+Jung Hoo Lee,2024,March,3,Monthly,0.381,0.689,0.392,94.7,108.9,8.3,0.0,40.0,25,
+Jung Hoo Lee,2024,April,4,Monthly,0.307,0.43,0.322,89.7,106.5,5.8,0.0,45.3,86,
+Jung Hoo Lee,2024,May,5,Monthly,0.268,0.44,0.304,85.0,105.8,17.6,0.0,26.5,34,
+Jung Hoo Lee,2024,Season Total,99,Season,0.304,0.456,0.325,89.2,108.9,9.0,0.0,40.0,145,27.2
+Jung Hoo Lee,2025,March,3,Monthly,0.361,0.425,0.342,85.4,103.8,-9.6,0.0,36.4,11,
+Jung Hoo Lee,2025,April,4,Monthly,0.352,0.509,0.367,89.0,104.5,14.0,0.0,32.6,89,
+Jung Hoo Lee,2025,May,5,Monthly,0.307,0.447,0.325,87.2,105.4,11.4,0.0,26.5,98,
+Jung Hoo Lee,2025,June,6,Monthly,0.265,0.38,0.274,86.3,104.9,14.8,0.0,36.8,76,
+Jung Hoo Lee,2025,July,7,Monthly,0.289,0.411,0.304,86.1,106.3,9.9,0.0,26.8,71,
+Jung Hoo Lee,2025,August,8,Monthly,0.346,0.46,0.349,85.4,105.1,4.7,0.0,36.9,84,
+Jung Hoo Lee,2025,September,9,Monthly,0.334,0.418,0.327,86.8,107.2,4.0,0.0,32.8,64,
+Jung Hoo Lee,2025,Season Total,99,Season,0.318,0.441,0.326,86.8,107.2,9.6,0.0,32.0,493,27.2
+Jung Hoo Lee,2026,March,3,Monthly,0.315,0.405,0.311,85.2,98.8,5.7,0.0,27.3,11,
+Jung Hoo Lee,2026,April,4,Monthly,0.348,0.47,0.355,89.7,107.6,12.8,0.0,37.0,81,
+Jung Hoo Lee,2026,May,5,Monthly,0.35,0.444,0.344,85.6,104.3,8.7,0.0,24.4,78,
+Jung Hoo Lee,2026,June,6,Monthly,0.365,0.456,0.355,86.1,102.6,9.9,0.0,30.4,56,
+Jung Hoo Lee,2026,Season Total,99,Season,0.351,0.454,0.349,87.2,107.6,10.3,0.0,30.5,226,27.2
+Ceddanne Rafaela,2023,August,8,Monthly,0.482,1.002,0.624,92.9,107.1,12.0,0.0,66.7,3,
+Ceddanne Rafaela,2023,September,9,Monthly,0.291,0.43,0.308,83.9,104.9,7.1,0.0,30.8,52,
+Ceddanne Rafaela,2023,October,10,Monthly,0.119,0.123,0.117,99.5,99.5,-25.0,0.0,100.0,1,
+Ceddanne Rafaela,2023,Season Total,99,Season,0.298,0.455,0.321,84.7,107.1,6.8,0.0,33.9,56,29.0
+Ceddanne Rafaela,2024,March,3,Monthly,0.356,0.456,0.348,83.3,102.3,21.8,0.0,13.0,23,
+Ceddanne Rafaela,2024,April,4,Monthly,0.29,0.531,0.352,84.4,106.5,15.7,0.0,34.8,69,
+Ceddanne Rafaela,2024,May,5,Monthly,0.278,0.45,0.316,83.9,105.8,14.2,0.0,34.8,69,
+Ceddanne Rafaela,2024,June,6,Monthly,0.304,0.459,0.331,88.6,108.2,8.9,0.0,41.5,65,
+Ceddanne Rafaela,2024,July,7,Monthly,0.335,0.564,0.387,86.5,106.4,13.4,0.0,34.3,70,
+Ceddanne Rafaela,2024,August,8,Monthly,0.346,0.54,0.384,86.0,104.3,16.5,0.0,41.3,75,
+Ceddanne Rafaela,2024,September,9,Monthly,0.326,0.59,0.391,86.7,105.0,15.3,0.0,37.2,43,
+Ceddanne Rafaela,2024,Season Total,99,Season,0.314,0.518,0.359,85.9,108.2,14.2,0.0,36.0,414,29.0
+Ceddanne Rafaela,2025,March,3,Monthly,0.21,0.388,0.254,88.4,104.5,8.4,0.0,33.3,12,
+Ceddanne Rafaela,2025,April,4,Monthly,0.325,0.592,0.387,90.7,109.1,10.2,0.0,47.7,65,
+Ceddanne Rafaela,2025,May,5,Monthly,0.332,0.583,0.387,88.5,108.1,10.9,0.0,45.1,71,
+Ceddanne Rafaela,2025,June,6,Monthly,0.332,0.609,0.397,90.9,112.1,9.7,0.0,48.6,72,
+Ceddanne Rafaela,2025,July,7,Monthly,0.287,0.542,0.347,89.2,109.7,13.2,0.0,37.3,75,
+Ceddanne Rafaela,2025,August,8,Monthly,0.291,0.423,0.307,82.6,107.7,11.8,0.0,29.1,79,
+Ceddanne Rafaela,2025,September,9,Monthly,0.303,0.458,0.326,84.5,107.9,18.4,0.0,25.0,60,
+Ceddanne Rafaela,2025,Season Total,99,Season,0.308,0.529,0.355,87.7,112.1,12.1,0.0,38.7,434,29.0
+Ceddanne Rafaela,2026,March,3,Monthly,0.217,0.384,0.254,86.6,98.6,28.5,0.0,22.2,9,
+Ceddanne Rafaela,2026,April,4,Monthly,0.324,0.478,0.343,89.3,108.6,9.2,0.0,43.1,58,
+Ceddanne Rafaela,2026,May,5,Monthly,0.31,0.482,0.34,85.8,106.0,8.8,0.0,35.1,77,
+Ceddanne Rafaela,2026,June,6,Monthly,0.324,0.453,0.334,82.3,105.5,12.8,0.0,30.6,49,
+Ceddanne Rafaela,2026,Season Total,99,Season,0.314,0.469,0.336,86.0,108.6,10.8,0.0,35.8,193,29.0
