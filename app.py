@@ -33,8 +33,8 @@ st.set_page_config(
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 ALL_SEASONS   = [2023, 2024, 2025, 2026]
-PA_COL        = "#FD5A1E"   # Player A — orange
-PB_COL        = "#3B82F6"   # Player B — blue
+PA_COL        = "#B0C4DE"   # Player A — light steel silver
+PB_COL        = "#2ECC9B"   # Player B — neptune green
 GOLD          = "#C4A962"
 CARD_BG       = "#1A1D2E"
 LINE_CLR      = "#2D3250"
@@ -274,6 +274,36 @@ def get_statcast_pitcher_raw(mlbam_id, season):
         return pd.DataFrame()
 
 @st.cache_data(ttl=7200, show_spinner=False)
+def get_fielding_stats(mlbam_id, seasons_tuple):
+    rows = []
+    for season in seasons_tuple:
+        url = (f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}/stats"
+               f"?stats=season&group=fielding&season={season}&gameType=R&sportId=1")
+        try:
+            splits = requests.get(url, headers=MLB_HEADERS, timeout=15).json()\
+                             .get("stats",[{}])[0].get("splits",[])
+        except Exception:
+            continue
+        for sp in splits:
+            s = sp.get("stat", {})
+            pos = sp.get("position", {}).get("abbreviation", "")
+            ip_raw = str(s.get("innings","0"))
+            try: inn = float(ip_raw)
+            except: inn = 0
+            if int(s.get("gamesPlayed", 0)) < 1: continue
+            rows.append({
+                "Season": season, "Pos": pos,
+                "G":  int(s.get("gamesPlayed", 0)),
+                "GS": int(s.get("gamesStarted", 0)),
+                "INN": round(inn, 1),
+                "PO": int(s.get("putOuts", 0)),
+                "A":  int(s.get("assists", 0)),
+                "E":  int(s.get("errors", 0)),
+                "FP": float(s.get("fielding", "0") or 0),
+            })
+    return pd.DataFrame(rows)
+
+@st.cache_data(ttl=7200, show_spinner=False)
 def get_monthly_hitting_api(mlbam_id, season):
     url = (f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}/stats"
            f"?stats=gameLog&season={season}&group=hitting&gameType=R&sportId=1")
@@ -495,7 +525,7 @@ mlbam_ids = {p: p_mlbam(p) for p in PLAYERS}
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 if mode == "Hitters":
-    t1,t2,t3,t4,t5 = st.tabs(["Overview","Hitting","Statcast","Plate Discipline","Defense"])
+    t1,t2,t3,t4,t5 = st.tabs(["Overview","Hitting","Defense","Statcast","Plate Discipline"])
 else:
     t1,t2,t3,t4,t5 = st.tabs(["Overview","Results","Arsenal","Batted Ball","Advanced"])
 
@@ -576,13 +606,15 @@ def season_bar(col, title, ref_val, ref_label, y_title, fmt="{:.3f}", height=340
                 "silent": True, "symbol": "none",
                 "lineStyle": {"color": GOLD, "type": "dashed", "width": 1.5},
                 "data": [{"yAxis": ref_val}],
-                "label": {"show": True, "formatter": ref_label, "color": GOLD, "position": "end"}
+                "label": {"show": True, "formatter": ref_label, "color": GOLD,
+                          "position": "insideEndTop", "backgroundColor": CARD_BG,
+                          "padding": [2, 4]}
             }
         series.append(ser)
     opts = {
         **_base(title),
         "legend": {"bottom": 4, "textStyle": {"color": TEXT}, "data": PLAYERS},
-        "grid": {"left": "5%", "right": "5%", "top": "15%", "bottom": "15%", "containLabel": True},
+        "grid": {"left": "5%", "right": "8%", "top": "15%", "bottom": "15%", "containLabel": True},
         "xAxis": {"type": "category", "data": season_set,
                   "axisLabel": {"color": TEXT},
                   "axisLine": {"lineStyle": {"color": LINE_CLR}}},
@@ -769,8 +801,81 @@ if mode == "Hitters":
                               .background_gradient(subset=[c for c in ["AVG","OBP","SLG","OPS"] if c in tbl.columns], cmap="RdYlGn"),
                      use_container_width=True, hide_index=True)
 
-    # ── TAB 3: STATCAST ────────────────────────────────────────────────────────
+    # ── TAB 3: DEFENSE ─────────────────────────────────────────────────────────
     with t3:
+        st.markdown('<div class="section-header">Fielding Stats — MLB Stats API</div>', unsafe_allow_html=True)
+        def_frames = []
+        for p in PLAYERS:
+            mid = mlbam_ids[p]
+            if not mid: continue
+            with st.spinner(f"Loading fielding stats for {p}..."):
+                df_f = get_fielding_stats(mid, seasons_key)
+            if df_f.empty: continue
+            df_f["Name"] = p
+            def_frames.append(df_f)
+        if def_frames:
+            def_tbl = pd.concat(def_frames, ignore_index=True)
+            show_cols = ["Name","Season","Pos","G","GS","INN","PO","A","E","FP"]
+            avail_def = [c for c in show_cols if c in def_tbl.columns]
+            st.dataframe(
+                def_tbl[avail_def].sort_values(["Name","Season"])
+                    .style.format({"FP":"{:.3f}","INN":"{:.1f}"}, na_rep="N/A")
+                    .background_gradient(subset=["FP"] if "FP" in avail_def else [], cmap="RdYlGn")
+                    .background_gradient(subset=["E"] if "E" in avail_def else [], cmap="RdYlGn_r"),
+                use_container_width=True, hide_index=True)
+
+            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+
+            def _def_bar(df_all, col, title, ref_val, ref_lbl, y_title, fmt):
+                season_set = sorted({str(int(r["Season"])) for _,r in df_all.iterrows()})
+                series = []
+                for player in PLAYERS:
+                    sub = df_all[df_all["Name"]==player]
+                    if sub.empty: continue
+                    agg = sub.groupby("Season")[col].mean().reset_index()
+                    sm = {str(int(r["Season"])): r[col] for _,r in agg.iterrows()}
+                    data = [sm.get(s) for s in season_set]
+                    color = COLORS[player]
+                    ser = {"name":player,"type":"bar","barMaxWidth":70,
+                           "itemStyle":{"color":_grad(color),"borderRadius":[4,4,0,0]},
+                           "data":[{"value":v,"label":{"show":v is not None,"position":"top",
+                               "formatter":fmt.format(v) if v else "","color":TEXT,"fontSize":10}}
+                               for v in data]}
+                    if not series and ref_val:
+                        ser["markLine"] = {"silent":True,"symbol":"none",
+                            "lineStyle":{"color":GOLD,"type":"dashed","width":1.5},
+                            "data":[{"yAxis":ref_val}],
+                            "label":{"show":True,"formatter":ref_lbl,"color":GOLD,
+                                     "position":"insideEndTop","backgroundColor":CARD_BG,"padding":[2,4]}}
+                    series.append(ser)
+                ech({**_base(title),
+                    "legend":{"bottom":4,"textStyle":{"color":TEXT},"data":PLAYERS},
+                    "grid":{"left":"5%","right":"8%","top":"15%","bottom":"15%","containLabel":True},
+                    "xAxis":{"type":"category","data":season_set,"axisLabel":{"color":TEXT},"axisLine":{"lineStyle":{"color":LINE_CLR}}},
+                    "yAxis":{"type":"value","name":y_title,"nameTextStyle":{"color":SUBTEXT},"splitLine":{"lineStyle":{"color":LINE_CLR}},"axisLabel":{"color":SUBTEXT}},
+                    "series":series}, height=320)
+
+            with c1:
+                _def_bar(def_tbl, "FP", "Fielding % by Season", 0.985, "MLB Avg (.985)", "FP", "{:.3f}")
+            with c2:
+                _def_bar(def_tbl, "A", "Outfield Assists by Season", None, None, "Assists", "{:.0f}")
+        else:
+            st.info("No fielding data available for selected players and seasons.")
+
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        st.markdown("""<div class="info-box">
+        <b style="color:#C4A962">Advanced Defensive Metrics (OAA, UZR, DRS):</b> These require
+        Baseball Savant / FanGraphs lookups.
+        &nbsp;<a href="https://baseballsavant.mlb.com/leaderboard/outs_above_average" target="_blank"
+        style="color:#C4A962">⟶ Baseball Savant OAA Leaderboard</a>
+        &nbsp;&nbsp;
+        <a href="https://www.fangraphs.com/leaders/major-league?pos=of&stats=fld" target="_blank"
+        style="color:#C4A962">⟶ FanGraphs Fielding Leaders</a>
+        </div>""", unsafe_allow_html=True)
+
+    # ── TAB 4: STATCAST ────────────────────────────────────────────────────────
+    with t4:
         sel_s3 = st.selectbox("Season", sorted(sel_seasons, reverse=True), key="sc_s")
         st.info("Statcast data may take 20-60 seconds to load on first access. Results are cached for 2 hours.")
 
@@ -846,8 +951,8 @@ if mode == "Hitters":
                 with c6:
                     ech(_career_bar("HardHit_pct","Hard Hit % by Season",37.5,"MLB Avg","%"))
 
-    # ── TAB 4: PLATE DISCIPLINE ────────────────────────────────────────────────
-    with t4:
+    # ── TAB 5: PLATE DISCIPLINE ────────────────────────────────────────────────
+    with t5:
         sel_s4 = st.selectbox("Season", sorted(sel_seasons, reverse=True), key="pd_s")
         st.markdown('<div class="section-header">Season Totals — MLB Stats API</div>', unsafe_allow_html=True)
 
@@ -883,20 +988,6 @@ if mode == "Hitters":
             monthly_line(sc_disc,"ZContact_pct","Zone Contact % by Month (higher=better)",84.0,"MLB Avg 84%","Z-Contact %",sel_s4)
         with c4:
             season_bar("BB%","Walk Rate by Season (%)",8.5,"MLB Avg 8.5%","BB %","{:.1f}")
-
-    # ── TAB 5: DEFENSE ─────────────────────────────────────────────────────────
-    with t5:
-        st.markdown('<div class="section-header">Defensive Value</div>', unsafe_allow_html=True)
-        st.info("Detailed defensive metrics (OAA, UZR, DRS, Def) are not available from the MLB Stats API. "
-                "Check the links below for full defensive leaderboards.")
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown("""<div class="info-box">
-        <b style="color:#C4A962">Note on OAA / UZR:</b> Outs Above Average and UZR require individual
-        Baseball Savant lookups. For players other than Jung Hoo Lee and Ceddanne Rafaela,
-        check <a href="https://baseballsavant.mlb.com/leaderboard/outs_above_average" target="_blank"
-        style="color:#C4A962">Baseball Savant OAA Leaderboard</a> for full defensive metrics.
-        </div>""", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
 # PITCHER TABS 2-5
