@@ -3,3 +3,5 @@ plotly>=5.22.0
 pandas>=2.0.0
 numpy>=1.26.0
 matplotlib>=3.8.0
+pybaseball>=2.2.7
+requests>=2.31.0
