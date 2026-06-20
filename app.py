@@ -681,7 +681,7 @@ def perf_index_bar(metrics, avgs, title):
             if not s.empty and col in s.columns:
                 raw = s[col].iloc[-1]
                 if pd.notna(raw): v = float(raw)
-            if v is not None and col in avgs and avgs[col]:
+            if v is not None and col in avgs and avgs[col] and (not lower or v != 0):
                 idx = round((avgs[col]/v*100) if lower else (v/avgs[col]*100), 1)
                 actual = fmt.format(v)
             else:
