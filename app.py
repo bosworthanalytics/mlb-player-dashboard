@@ -835,16 +835,16 @@ def render_fa_tab():
   <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">{d.get('debut','—')}</div>
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">YEARS IN MLB (EST.)</div>
   <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">~{int(d.get('svc_float',0))} seasons</div>
-  <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">CBA STATUS</div>
+  <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">FA ELIGIBILITY (EST.)</div>
   <div style="font-size:.95rem;font-weight:600;color:{sc};margin-bottom:10px">{d.get('status','—')}</div>
+  <div style="font-size:.72rem;color:#9BA3B8;margin-top:-6px;margin-bottom:10px">Players under extension may show FA Eligible</div>
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">EST. FA YEAR</div>
   <div style="font-size:1.05rem;color:{TEXT};font-weight:700">{d.get('fa_year','—')}</div>
 </div>""", unsafe_allow_html=True)
             q = player.replace(" ", "+")
-            st.markdown(
-                f'<div style="margin-top:8px"><a href="https://www.spotrac.com/search/?query={q}+mlb"'
-                f' target="_blank" style="color:{GOLD};font-size:.85rem">View contract on Spotrac →</a></div>',
-                unsafe_allow_html=True)
+            st.link_button("View contract on Spotrac →",
+                           f"https://www.spotrac.com/search/?query={q}",
+                           use_container_width=True)
 
     # ── Service time progress chart ───────────────────────────────────────────
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
@@ -895,10 +895,11 @@ def render_fa_tab():
     <b style="color:#C4A962">MLB Service Time Rules (2023 CBA):</b><br/>
     <b>Pre-Arb:</b> &lt;3 service years — team controls salary &nbsp;·&nbsp;
     <b>Super Two:</b> Top ~22% of players with 2–3 yrs earn a 4th arbitration year &nbsp;·&nbsp;
-    <b>Arb 1–3:</b> 3–6 service years — salary determined by arbitration &nbsp;·&nbsp;
-    <b>FA Eligible:</b> 6 full service years — free to sign with any team<br/>
-    <i style="color:#9BA3B8">Note: years shown are calendar seasons since debut, not exact service time.
-    Actual service time may be lower due to IL stints. Est. FA year = debut year + 6.</i>
+    <b>Arb 1–3:</b> 3–6 service years — salary set by arbitration &nbsp;·&nbsp;
+    <b>FA Eligible:</b> 6 full service years — earned the right to free agency<br/>
+    <i style="color:#9BA3B8">FA Eligibility is estimated from MLB debut date (calendar years, not exact service time).
+    Players under a contract extension will show as FA Eligible even if they are not currently a free agent.
+    See Spotrac for current contract status and projected next deal.</i>
     </div>""", unsafe_allow_html=True)
 
     # ── Full contract links ────────────────────────────────────────────────────
@@ -911,12 +912,9 @@ def render_fa_tab():
     for col, player in zip([lc1, lc2], PLAYERS):
         with col:
             q = player.replace(" ", "+")
-            st.markdown(
-                f'<a href="https://www.spotrac.com/search/?query={q}+mlb" target="_blank">'
-                f'<div style="background:{CARD_BG};border:1px solid {LINE_CLR};border-radius:8px;'
-                f'padding:12px;text-align:center">'
-                f'<span style="color:{GOLD};font-size:.9rem">Spotrac: {player} →</span>'
-                f'</div></a>', unsafe_allow_html=True)
+            st.link_button(f"Spotrac: {player} →",
+                           f"https://www.spotrac.com/search/?query={q}",
+                           use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
 # HITTER TABS 2-5
