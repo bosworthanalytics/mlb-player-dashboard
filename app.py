@@ -418,12 +418,14 @@ def build_arsenal(sc):
         Velo=("release_speed","mean"),
         Spin=("release_spin_rate","mean"),
         xwOBA=("estimated_woba_using_speedangle","mean"),
+        EV=("launch_speed","mean"),
     ).reset_index()
     total = agg["Count"].sum()
     agg["Usage%"] = (agg["Count"]/total*100).round(1)
     agg["Velo"]   = agg["Velo"].round(1)
     agg["Spin"]   = agg["Spin"].round(0)
     agg["xwOBA"]  = agg["xwOBA"].round(3)
+    agg["EV"]     = agg["EV"].round(1)
     agg["Pitch"]  = agg["pitch_type"].map(PITCH_NAMES).fillna(agg["pitch_type"])
     return agg.sort_values("Usage%", ascending=False)
 
@@ -731,7 +733,7 @@ with t1:
                     [{"xAxis":20,"itemStyle":{"color":"rgba(231,76,60,0.08)"}},{"xAxis":40}],
                     [{"xAxis":40,"itemStyle":{"color":"rgba(230,126,34,0.08)"}},{"xAxis":50}],
                     [{"xAxis":50,"itemStyle":{"color":"rgba(196,169,98,0.08)"}},{"xAxis":60}],
-                    [{"xAxis":60,"itemStyle":{"color":"rgba(46,204,113,0.08)"}},{"xAxis":95}],
+                    [{"xAxis":60,"itemStyle":{"color":"rgba(46,204,113,0.08)"}},{"xAxis":80}],
                 ]}
                 ser["markLine"] = {"silent":True,"symbol":"none",
                     "lineStyle":{"color":GOLD,"type":"dashed","width":1.5},
@@ -741,7 +743,7 @@ with t1:
             **_base("Tool Grades — 20-80 Scale"),
             "legend": {"bottom":4,"textStyle":{"color":TEXT},"data":[p for p in PLAYERS if p in SCOUTING]},
             "grid": {"left":"3%","right":"22%","top":"10%","bottom":"10%","containLabel":True},
-            "xAxis": {"type":"value","min":20,"max":95,
+            "xAxis": {"type":"value","min":20,"max":80,
                       "axisLabel":{"color":SUBTEXT,"formatter":"{value}"},
                       "splitLine":{"lineStyle":{"color":LINE_CLR}},
                       "axisLine":{"lineStyle":{"color":LINE_CLR}},
@@ -1069,29 +1071,30 @@ else:
 
             with ca2:
                 pitches = ars["Pitch"].tolist()
-                velos = ars["Velo"].tolist()
+                evs = [float(v) if pd.notna(v) else None for v in ars["EV"].tolist()]
                 ech({
                     "backgroundColor": CARD_BG,
-                    "title": {"text":"Avg Velocity by Pitch","textStyle":{"color":TEXT,"fontSize":13},"left":"center","top":4},
+                    "title": {"text":"Avg Exit Velocity by Pitch (mph)","textStyle":{"color":TEXT,"fontSize":13},"left":"center","top":4},
                     "tooltip": {"trigger":"axis","backgroundColor":CARD_BG,"borderColor":LINE_CLR,"textStyle":{"color":TEXT}},
                     "grid": {"left":"3%","right":"18%","top":"15%","bottom":"10%","containLabel":True},
-                    "xAxis": {"type":"value","min":60,"max":105,
+                    "xAxis": {"type":"value","min":75,"max":100,
                               "splitLine":{"lineStyle":{"color":LINE_CLR}},
                               "axisLabel":{"color":SUBTEXT},"axisLine":{"lineStyle":{"color":LINE_CLR}}},
                     "yAxis": {"type":"category","data":pitches,
                               "axisLabel":{"color":TEXT},"axisLine":{"lineStyle":{"color":LINE_CLR}}},
                     "series": [{"type":"bar",
                         "itemStyle":{"color":_hgrad(color),"borderRadius":[0,4,4,0]},
-                        "data":[{"value":v,"label":{"show":True,"position":"right",
-                            "formatter":f"{v:.1f} mph","color":TEXT,"fontSize":10}} for v in velos]}],
+                        "data":[{"value":v,"label":{"show":v is not None,"position":"right",
+                            "formatter":f"{v:.1f}" if v is not None else "","color":TEXT,"fontSize":10}}
+                            for v in evs]}],
                 }, height=300)
 
             # Arsenal table
-            disp_ars = ars[["Pitch","Usage%","Velo","Spin","xwOBA"]].rename(
-                columns={"Usage%":"Usage %","Velo":"Avg Velo (mph)","Spin":"Avg Spin (rpm)"})
+            disp_ars = ars[["Pitch","Usage%","Velo","EV","Spin","xwOBA"]].rename(
+                columns={"Usage%":"Usage %","Velo":"Release Velo","EV":"Avg EV (mph)","Spin":"Avg Spin (rpm)"})
             st.dataframe(
-                disp_ars.style.format({"Usage %":"{:.1f}","Avg Velo (mph)":"{:.1f}",
-                                       "Avg Spin (rpm)":"{:.0f}","xwOBA":"{:.3f}"}, na_rep="N/A")
+                disp_ars.style.format({"Usage %":"{:.1f}","Release Velo":"{:.1f}",
+                                       "Avg EV (mph)":"{:.1f}","Avg Spin (rpm)":"{:.0f}","xwOBA":"{:.3f}"}, na_rep="N/A")
                                .background_gradient(subset=["xwOBA"], cmap="RdYlGn_r"),
                 use_container_width=True, hide_index=True)
             st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
