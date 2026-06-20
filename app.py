@@ -913,7 +913,11 @@ def generate_pdf():
         return None
 
     def _s(v):
-        return str(v).encode("latin-1", "replace").decode("latin-1")
+        return (str(v)
+                .replace("—", "-")   # em dash
+                .replace("–", "-")   # en dash
+                .replace("•", "*")   # bullet
+                .encode("latin-1", "replace").decode("latin-1"))
 
     def _strip_md(t):
         return re.sub(r"\*+([^*]+)\*+", r"\1", str(t))
