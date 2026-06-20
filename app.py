@@ -305,37 +305,40 @@ def get_fielding_stats(mlbam_id, seasons_tuple):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_fa_info(mlbam_id):
-    """Service time, debut date, and CBA status from MLB Stats API."""
+    """Debut date, team, position, and estimated CBA status from MLB Stats API.
+    serviceTime is not in the public API — we estimate from mlbDebutDate."""
+    from datetime import date as _date
     try:
         r = requests.get(
-            f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}"
-            f"?hydrate=currentTeam"
-            f"&fields=people(id,fullName,mlbDebutDate,serviceTime,currentTeam,active,primaryPosition)",
+            f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}?hydrate=currentTeam",
             headers=MLB_HEADERS, timeout=10)
         r.raise_for_status()
-        p = r.json()["people"][0]
+        people = r.json().get("people", [])
+        if not people:
+            return {}
+        p     = people[0]
         debut = p.get("mlbDebutDate", "")
-        svc   = p.get("serviceTime", "")
         team  = p.get("currentTeam", {}).get("name", "Unknown")
         pos   = p.get("primaryPosition", {}).get("abbreviation", "")
-        svc_years, svc_days = 0, 0
-        if svc:
-            parts = str(svc).split(".")
-            svc_years = int(parts[0])
-            svc_days  = int(parts[1]) if len(parts) > 1 else 0
-        svc_float = round(svc_years + svc_days / 172, 3)
+        # Estimate MLB years from debut date (calendar years; actual service time
+        # may be lower if player had significant IL time)
+        svc_float = 0.0
+        fa_year   = None
+        if debut:
+            debut_year = int(debut[:4])
+            svc_float  = float(_date.today().year - debut_year)
+            fa_year    = debut_year + 6
         if svc_float >= 6.0:
             status, sc = "FA Eligible", "#2ECC9B"
         elif svc_float >= 3.0:
             arb_n = min(3, int(svc_float) - 2)
             status, sc = f"Arb {arb_n} Eligible", "#C4A962"
-        elif svc_float >= 2.134:
-            status, sc = "Super Two (Arb Eligible)", "#C4A962"
+        elif svc_float >= 2.0:
+            status, sc = "Approaching Arb", "#C4A962"
         else:
             status, sc = "Pre-Arbitration", SUBTEXT
-        fa_year = (int(debut[:4]) + 6) if debut else None
-        return {"debut": debut, "svc": svc, "svc_years": svc_years, "svc_days": svc_days,
-                "svc_float": svc_float, "team": team, "pos": pos,
+        return {"debut": debut, "svc_float": svc_float,
+                "team": team, "pos": pos,
                 "status": status, "status_clr": sc, "fa_year": fa_year}
     except Exception:
         return {}
@@ -830,8 +833,8 @@ def render_fa_tab():
   <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">{d.get('pos','—')}</div>
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">MLB DEBUT</div>
   <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">{d.get('debut','—')}</div>
-  <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">SERVICE TIME</div>
-  <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">{d.get('svc_years',0)} yrs, {d.get('svc_days',0)} days</div>
+  <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">YEARS IN MLB (EST.)</div>
+  <div style="font-size:.95rem;color:{TEXT};margin-bottom:10px">~{int(d.get('svc_float',0))} seasons</div>
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">CBA STATUS</div>
   <div style="font-size:.95rem;font-weight:600;color:{sc};margin-bottom:10px">{d.get('status','—')}</div>
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">EST. FA YEAR</div>
@@ -854,7 +857,7 @@ def render_fa_tab():
         remain = [round(max(0.0, 6.0 - d["svc_float"]), 3) for _, d in valid]
         ech({
             "backgroundColor": CARD_BG,
-            "title": {"text": "MLB Service Years  (6.000 = FA Eligible)",
+            "title": {"text": "Est. MLB Seasons Since Debut  (6 = typically FA eligible)",
                       "textStyle": {"color": TEXT, "fontSize": 13}, "left": "center", "top": 4},
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"},
                         "backgroundColor": CARD_BG, "borderColor": LINE_CLR,
@@ -894,8 +897,8 @@ def render_fa_tab():
     <b>Super Two:</b> Top ~22% of players with 2–3 yrs earn a 4th arbitration year &nbsp;·&nbsp;
     <b>Arb 1–3:</b> 3–6 service years — salary determined by arbitration &nbsp;·&nbsp;
     <b>FA Eligible:</b> 6 full service years — free to sign with any team<br/>
-    <i style="color:{SUBTEXT}">Note: service time is paused during IL stints and option years.
-    Est. FA year is debut year + 6 and may differ from actual eligibility.</i>
+    <i style="color:#9BA3B8">Note: years shown are calendar seasons since debut, not exact service time.
+    Actual service time may be lower due to IL stints. Est. FA year = debut year + 6.</i>
     </div>""", unsafe_allow_html=True)
 
     # ── Full contract links ────────────────────────────────────────────────────
