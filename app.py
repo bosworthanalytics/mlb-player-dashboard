@@ -841,9 +841,9 @@ def render_fa_tab():
   <div style="font-size:.78rem;color:{SUBTEXT};letter-spacing:.05em">EST. FA YEAR</div>
   <div style="font-size:1.05rem;color:{TEXT};font-weight:700">{d.get('fa_year','—')}</div>
 </div>""", unsafe_allow_html=True)
-            q = player.replace(" ", "+")
+            q = player.replace(" ", "+") + "+spotrac+mlb+contract"
             st.link_button("View contract on Spotrac →",
-                           f"https://www.spotrac.com/search/?query={q}",
+                           f"https://www.google.com/search?q={q}",
                            use_container_width=True)
 
     # ── Service time progress chart ───────────────────────────────────────────
@@ -911,9 +911,9 @@ def render_fa_tab():
     lc1, lc2 = st.columns(2)
     for col, player in zip([lc1, lc2], PLAYERS):
         with col:
-            q = player.replace(" ", "+")
+            q = player.replace(" ", "+") + "+spotrac+mlb+contract"
             st.link_button(f"Spotrac: {player} →",
-                           f"https://www.spotrac.com/search/?query={q}",
+                           f"https://www.google.com/search?q={q}",
                            use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
