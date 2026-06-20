@@ -56,8 +56,8 @@ HIT_AVG = {
     "EV_avg":88.5,"HardHit%":37.5,
 }
 PIT_AVG = {
-    "ERA":4.20,"FIP":4.10,"xFIP":4.10,"WHIP":1.28,
-    "K%":23.0,"BB%":8.5,"K-BB%":14.5,"GB%":43.0,"HardHit%":37.5,
+    "ERA":4.20,"WHIP":1.28,
+    "K%":23.0,"BB%":8.5,"K-BB%":14.5,"K/9":9.0,"BB/9":3.1,
 }
 
 SCOUTING = {
@@ -112,47 +112,94 @@ st.markdown("""<style>
 
 # ── Cached data loaders ────────────────────────────────────────────────────────
 
+MLB_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MLBDashboard/1.0)"}
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_fg_batting(seasons_tuple):
-    if not HAS_PB:
-        raise RuntimeError(f"pybaseball not available: {PB_IMPORT_ERROR}")
-    errors, frames = [], []
-    for s in seasons_tuple:
+def load_mlb_hitting(seasons_tuple):
+    """Season hitting stats for all players via MLB Stats API (never blocked)."""
+    frames = []
+    for season in seasons_tuple:
+        url = (f"https://statsapi.mlb.com/api/v1/stats"
+               f"?stats=season&group=hitting&gameType=R&season={season}"
+               f"&sportId=1&limit=2000&offset=0")
         try:
-            df = batting_stats(s, s, qual=50, ind=1)
-            df["Season"] = int(s)
-            frames.append(df)
+            splits = requests.get(url, headers=MLB_HEADERS, timeout=20).json()\
+                             .get("stats",[{}])[0].get("splits",[])
         except Exception as e:
-            errors.append(f"{s}: {e}")
+            raise RuntimeError(f"MLB Stats API failed for {season}: {e}")
+        rows = []
+        for sp in splits:
+            p = sp.get("player", {}); t = sp.get("team", {}); s = sp.get("stat", {})
+            pa = int(s.get("plateAppearances", 0))
+            if pa < 30: continue
+            ab = int(s.get("atBats", 0)); h = int(s.get("hits", 0))
+            bb = int(s.get("baseOnBalls", 0)); so = int(s.get("strikeOuts", 0))
+            hr = int(s.get("homeRuns", 0))
+            d2 = int(s.get("doubles", 0)); d3 = int(s.get("triples", 0))
+            rows.append({
+                "Name": p.get("fullName",""), "IDmlb": p.get("id"),
+                "Team": t.get("name",""), "Season": season,
+                "G": int(s.get("gamesPlayed",0)), "PA": pa, "AB": ab,
+                "H": h, "2B": d2, "3B": d3, "HR": hr,
+                "RBI": int(s.get("rbi",0)), "SB": int(s.get("stolenBases",0)),
+                "BB": bb, "SO": so,
+                "AVG": float(s.get("avg","0") or 0),
+                "OBP": float(s.get("obp","0") or 0),
+                "SLG": float(s.get("slg","0") or 0),
+                "OPS": float(s.get("ops","0") or 0),
+                "K%":  round(so/pa*100,1) if pa>0 else None,
+                "BB%": round(bb/pa*100,1) if pa>0 else None,
+            })
+        if rows:
+            frames.append(pd.DataFrame(rows))
     if not frames:
-        raise RuntimeError("batting_stats() returned no data. Errors: " + "; ".join(errors))
+        raise RuntimeError("MLB Stats API returned no hitting data.")
     return pd.concat(frames, ignore_index=True)
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_fg_pitching(seasons_tuple):
-    if not HAS_PB:
-        raise RuntimeError(f"pybaseball not available: {PB_IMPORT_ERROR}")
-    errors, frames = [], []
-    for s in seasons_tuple:
+def load_mlb_pitching(seasons_tuple):
+    """Season pitching stats for all pitchers via MLB Stats API."""
+    frames = []
+    for season in seasons_tuple:
+        url = (f"https://statsapi.mlb.com/api/v1/stats"
+               f"?stats=season&group=pitching&gameType=R&season={season}"
+               f"&sportId=1&limit=2000&offset=0")
         try:
-            df = pitching_stats(s, s, qual=10, ind=1)
-            df["Season"] = int(s)
-            frames.append(df)
+            splits = requests.get(url, headers=MLB_HEADERS, timeout=20).json()\
+                             .get("stats",[{}])[0].get("splits",[])
         except Exception as e:
-            errors.append(f"{s}: {e}")
+            raise RuntimeError(f"MLB Stats API failed for {season}: {e}")
+        rows = []
+        for sp in splits:
+            p = sp.get("player", {}); t = sp.get("team", {}); s = sp.get("stat", {})
+            ip_raw = str(s.get("inningsPitched","0.0"))
+            pts = ip_raw.split(".")
+            ip = int(pts[0]) + (int(pts[1])/3 if len(pts)>1 and pts[1] else 0)
+            if ip < 5: continue
+            er = int(s.get("earnedRuns",0)); h_a = int(s.get("hits",0))
+            bb = int(s.get("baseOnBalls",0)); so = int(s.get("strikeOuts",0))
+            hr = int(s.get("homeRuns",0)); tbf = int(s.get("battersFaced",0))
+            rows.append({
+                "Name": p.get("fullName",""), "IDmlb": p.get("id"),
+                "Team": t.get("name",""), "Season": season,
+                "G": int(s.get("gamesPitched",0)), "GS": int(s.get("gamesStarted",0)),
+                "W": int(s.get("wins",0)), "L": int(s.get("losses",0)),
+                "SV": int(s.get("saves",0)), "IP": round(ip,1),
+                "H": h_a, "ER": er, "HR": hr, "BB": bb, "SO": so,
+                "ERA":  round(er/ip*9,2)      if ip>0  else None,
+                "WHIP": round((h_a+bb)/ip,3)  if ip>0  else None,
+                "K/9":  round(so/ip*9,1)      if ip>0  else None,
+                "BB/9": round(bb/ip*9,1)      if ip>0  else None,
+                "K%":   round(so/tbf*100,1)   if tbf>0 else None,
+                "BB%":  round(bb/tbf*100,1)   if tbf>0 else None,
+                "K-BB%":round((so-bb)/tbf*100,1) if tbf>0 else None,
+                "HR/9": round(hr/ip*9,1)      if ip>0  else None,
+            })
+        if rows:
+            frames.append(pd.DataFrame(rows))
     if not frames:
-        raise RuntimeError("pitching_stats() returned no data. Errors: " + "; ".join(errors))
+        raise RuntimeError("MLB Stats API returned no pitching data.")
     return pd.concat(frames, ignore_index=True)
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_mlbam_id(fg_id_int):
-    try:
-        lu = playerid_reverse_lookup([int(fg_id_int)], key_type="fangraphs")
-        if not lu.empty:
-            return int(lu.iloc[0]["key_mlbam"])
-    except Exception:
-        pass
-    return None
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def get_statcast_batter_raw(mlbam_id, season):
@@ -314,28 +361,22 @@ with st.sidebar:
     seasons_key = tuple(sorted(sel_seasons))
     st.markdown("---")
 
-    if not HAS_PB:
-        st.error(f"pybaseball failed to import: {PB_IMPORT_ERROR}")
-        st.info("The app may still be installing dependencies. Wait 2 minutes and reboot the app from the Streamlit Cloud dashboard.")
-        st.stop()
-
     loader_label = "Loading hitter list..." if mode=="Hitters" else "Loading pitcher list..."
     all_fg = pd.DataFrame()
     load_error = None
     with st.spinner(loader_label):
         try:
-            all_fg = load_fg_batting(seasons_key) if mode=="Hitters" else load_fg_pitching(seasons_key)
+            all_fg = load_mlb_hitting(seasons_key) if mode=="Hitters" else load_mlb_pitching(seasons_key)
         except Exception as e:
             load_error = str(e)
 
     if all_fg.empty or load_error:
         st.error("Could not load player list.")
         st.code(load_error or "No data returned.", language=None)
-        st.info("Try: Streamlit Cloud → Manage app (bottom-right) → Reboot app")
         st.stop()
 
-    sort_col = "wRC+" if (mode=="Hitters" and "wRC+" in all_fg.columns) else \
-               "FIP"  if (mode=="Pitchers" and "FIP" in all_fg.columns) else "Name"
+    sort_col = "OPS" if (mode=="Hitters" and "OPS" in all_fg.columns) else \
+               "ERA" if (mode=="Pitchers" and "ERA" in all_fg.columns) else "Name"
     sort_asc  = mode == "Pitchers"
     player_list = (all_fg.sort_values("Season", ascending=False)
                          .drop_duplicates("Name")
@@ -365,9 +406,9 @@ COLORS  = {player_a: PA_COL, player_b: PB_COL}
 def p_seasons(name): return all_fg[all_fg["Name"]==name].sort_values("Season")
 def p_latest(name):
     d = p_seasons(name); return d.iloc[-1] if not d.empty else None
-def p_fg_id(name):
+def p_mlbam(name):
     r = p_latest(name)
-    return int(r["IDfg"]) if r is not None and "IDfg" in r.index and pd.notna(r.get("IDfg")) else None
+    return int(r["IDmlb"]) if r is not None and "IDmlb" in r.index and pd.notna(r.get("IDmlb")) else None
 def safe(val, fmt="{:.3f}"):
     try: return fmt.format(float(val)) if val is not None and pd.notna(val) else "N/A"
     except: return "N/A"
@@ -384,8 +425,7 @@ st.markdown(f"""
 hcols = st.columns([1, 0.08, 1])
 for col_w, player in zip([hcols[0], hcols[2]], PLAYERS):
     color   = COLORS[player]
-    fg_id   = p_fg_id(player)
-    mlbam   = get_mlbam_id(fg_id) if fg_id else None
+    mlbam   = p_mlbam(player)
     row     = p_latest(player)
     team    = row["Team"] if row is not None and "Team" in row.index else "MLB"
     hs_url  = (f"https://img.mlbstatic.com/mlb-photos/image/upload/"
@@ -402,11 +442,8 @@ for col_w, player in zip([hcols[0], hcols[2]], PLAYERS):
           <div class="player-team">{team}</div>
         </div>""", unsafe_allow_html=True)
 
-# Resolve MLBAM IDs for both players (shown once, reused everywhere)
-mlbam_ids = {}
-for p in PLAYERS:
-    fg_id = p_fg_id(p)
-    mlbam_ids[p] = get_mlbam_id(fg_id) if fg_id else None
+# MLBAM IDs come directly from MLB Stats API — no reverse lookup needed
+mlbam_ids = {p: p_mlbam(p) for p in PLAYERS}
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 if mode == "Hitters":
@@ -496,8 +533,6 @@ with t1:
             ("OBP",    "OBP",   "{:.3f}", False),
             ("SLG",    "SLG",   "{:.3f}", False),
             ("OPS",    "OPS",   "{:.3f}", False),
-            ("wOBA",   "wOBA",  "{:.3f}", False),
-            ("wRC+",   "wRC+",  "{:.0f}", False),
             ("BB %",   "BB%",   "{:.1f}%",False),
             ("K % (lower=better)","K%","{:.1f}%",True),
         ]
@@ -511,13 +546,12 @@ with t1:
     else:  # Pitchers
         pit_metrics = [
             ("ERA (lower=better)", "ERA",   "{:.2f}", True),
-            ("FIP (lower=better)", "FIP",   "{:.2f}", True),
-            ("xFIP (lower=better)","xFIP",  "{:.2f}", True),
             ("WHIP (lower=better)","WHIP",  "{:.3f}", True),
             ("K %",   "K%",    "{:.1f}%", False),
             ("BB % (lower=better)","BB%",  "{:.1f}%", True),
             ("K-BB %","K-BB%", "{:.1f}%", False),
-            ("GB %",  "GB%",   "{:.1f}%", False),
+            ("K/9",   "K/9",   "{:.1f}",  False),
+            ("BB/9 (lower=better)","BB/9", "{:.1f}",  True),
         ]
         st.markdown('<div class="section-header">Latest Season Performance Index</div>', unsafe_allow_html=True)
         st.plotly_chart(perf_index_bar(pit_metrics, PIT_AVG,
@@ -599,11 +633,11 @@ if mode == "Hitters":
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Season Totals</div>', unsafe_allow_html=True)
-        disp_cols = ["Name","Season","G","PA","AB","H","AVG","OBP","SLG","OPS","HR","RBI","SB","BB","SO","wOBA","wRC+","WAR"]
+        disp_cols = ["Name","Season","G","PA","AB","H","AVG","OBP","SLG","OPS","HR","RBI","SB","BB","SO","K%","BB%"]
         avail = [c for c in disp_cols if c in all_fg.columns]
         tbl = pd.concat([p_seasons(p) for p in PLAYERS])[avail].sort_values(["Name","Season"])
-        fmt_map = {c:"{:.3f}" for c in ["AVG","OBP","SLG","OPS","wOBA"]}
-        fmt_map.update({c:"{:.1f}" for c in ["wRC+","WAR"]})
+        fmt_map = {c:"{:.3f}" for c in ["AVG","OBP","SLG","OPS"]}
+        fmt_map.update({c:"{:.1f}" for c in ["K%","BB%"]})
         st.dataframe(tbl.style.format(fmt_map, na_rep="N/A")
                               .background_gradient(subset=[c for c in ["AVG","OBP","SLG","OPS"] if c in tbl.columns], cmap="RdYlGn"),
                      use_container_width=True, hide_index=True)
@@ -691,7 +725,7 @@ if mode == "Hitters":
     # ── TAB 4: PLATE DISCIPLINE ────────────────────────────────────────────────
     with t4:
         sel_s4 = st.selectbox("Season", sorted(sel_seasons, reverse=True), key="pd_s")
-        st.markdown('<div class="section-header">Season Totals — FanGraphs</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Season Totals — MLB Stats API</div>', unsafe_allow_html=True)
 
         disc_cols = ["Name","Season","BB%","K%","SwStr%","O-Swing%","Z-Contact%","Contact%","Zone%"]
         avail_d = [c for c in disc_cols if c in all_fg.columns]
@@ -733,24 +767,9 @@ if mode == "Hitters":
 
     # ── TAB 5: DEFENSE ─────────────────────────────────────────────────────────
     with t5:
-        st.markdown('<div class="section-header">Defensive Value — FanGraphs</div>', unsafe_allow_html=True)
-        def_cols = ["Name","Season","Def","UBR"]
-        avail_def = [c for c in def_cols if c in all_fg.columns]
-        if len(avail_def) > 2:
-            def_tbl = pd.concat([p_seasons(p) for p in PLAYERS])[avail_def].sort_values(["Name","Season"])
-            st.dataframe(def_tbl.style.format({c:"{:.1f}" for c in avail_def if c not in ["Name","Season"]}, na_rep="N/A")
-                                      .background_gradient(subset=[c for c in ["Def","UBR"] if c in def_tbl.columns], cmap="RdYlGn"),
-                         use_container_width=True, hide_index=True)
-
-            c1,c2 = st.columns(2)
-            with c1:
-                st.plotly_chart(season_bar("Def","Defensive Runs (Def) by Season",
-                    0,"Average (0)","Runs","{:.1f}"), use_container_width=True)
-            with c2:
-                st.plotly_chart(season_bar("UBR","Ultimate Base Running (UBR) by Season",
-                    0,"Average (0)","Runs","{:.1f}"), use_container_width=True)
-        else:
-            st.info("Defensive columns not available from FanGraphs for these seasons.")
+        st.markdown('<div class="section-header">Defensive Value</div>', unsafe_allow_html=True)
+        st.info("Detailed defensive metrics (OAA, UZR, DRS, Def) are not available from the MLB Stats API. "
+                "Check the links below for full defensive leaderboards.")
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown("""<div class="info-box">
@@ -797,14 +816,14 @@ else:
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Career Season Totals</div>', unsafe_allow_html=True)
-        p_cols = ["Name","Season","G","GS","IP","W","L","ERA","FIP","xFIP","WHIP","K%","BB%","K-BB%","WAR","SIERA","BABIP","LOB%"]
+        p_cols = ["Name","Season","G","GS","IP","W","L","SV","ERA","WHIP","K/9","BB/9","K%","BB%","K-BB%","HR/9"]
         avail_p = [c for c in p_cols if c in all_fg.columns]
         p_tbl = pd.concat([p_seasons(p) for p in PLAYERS])[avail_p].sort_values(["Name","Season"])
-        pfmt = {c:"{:.2f}" for c in ["ERA","FIP","xFIP","WHIP","SIERA","BABIP"]}
-        pfmt.update({c:"{:.1f}" for c in ["IP","K%","BB%","K-BB%","LOB%","WAR"]})
+        pfmt = {c:"{:.2f}" for c in ["ERA","WHIP"]}
+        pfmt.update({c:"{:.1f}" for c in ["IP","K/9","BB/9","K%","BB%","K-BB%","HR/9"]})
         st.dataframe(p_tbl.style.format(pfmt, na_rep="N/A")
-                               .background_gradient(subset=[c for c in ["ERA","FIP","xFIP","WHIP"] if c in p_tbl.columns], cmap="RdYlGn_r")
-                               .background_gradient(subset=[c for c in ["K%","K-BB%","WAR"] if c in p_tbl.columns], cmap="RdYlGn"),
+                               .background_gradient(subset=[c for c in ["ERA","WHIP"] if c in p_tbl.columns], cmap="RdYlGn_r")
+                               .background_gradient(subset=[c for c in ["K%","K-BB%","K/9"] if c in p_tbl.columns], cmap="RdYlGn"),
                      use_container_width=True, hide_index=True)
 
     # ── TAB 3: ARSENAL ─────────────────────────────────────────────────────────
@@ -868,23 +887,25 @@ else:
 
     # ── TAB 4: BATTED BALL ─────────────────────────────────────────────────────
     with t4:
-        st.markdown('<div class="section-header">Batted Ball Profile — FanGraphs Season Totals</div>', unsafe_allow_html=True)
-        bb_cols = ["Name","Season","GB%","FB%","LD%","IFFB%","HR/FB","Hard%","Soft%","Med%","BABIP"]
+        st.markdown('<div class="section-header">Batted Ball Profile — Season Totals</div>', unsafe_allow_html=True)
+        bb_cols = ["Name","Season","HR","HR/9","ERA","WHIP","K%","BB%","K-BB%"]
         avail_bb = [c for c in bb_cols if c in all_fg.columns]
         bb_tbl = pd.concat([p_seasons(p) for p in PLAYERS])[avail_bb].sort_values(["Name","Season"])
         st.dataframe(
-            bb_tbl.style.format({c:"{:.1f}" for c in avail_bb if c not in ["Name","Season","BABIP"]}
-                                | {"BABIP":"{:.3f}"}, na_rep="N/A")
-                        .background_gradient(subset=[c for c in ["GB%","Hard%"] if c in bb_tbl.columns], cmap="RdYlGn"),
+            bb_tbl.style.format({c:"{:.2f}" for c in ["ERA","WHIP"]}
+                                | {c:"{:.1f}" for c in ["HR/9","K%","BB%","K-BB%"]}, na_rep="N/A")
+                        .background_gradient(subset=[c for c in ["K%","K-BB%"] if c in bb_tbl.columns], cmap="RdYlGn")
+                        .background_gradient(subset=[c for c in ["ERA","WHIP","HR/9"] if c in bb_tbl.columns], cmap="RdYlGn_r"),
             use_container_width=True, hide_index=True)
+        st.info("GB%, FB%, LD%, Hard% are FanGraphs metrics not available from MLB Stats API. "
+                "See Baseball Savant for detailed batted ball profiles.")
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         c1,c2 = st.columns(2)
         with c1:
-            st.plotly_chart(season_bar("GB%","GB% by Season",43.0,"MLB Avg 43%","GB %","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("HR/9","HR/9 by Season",1.2,"MLB Avg (1.2)","HR/9","{:.1f}"), use_container_width=True)
         with c2:
-            if "Hard%" in all_fg.columns:
-                st.plotly_chart(season_bar("Hard%","Hard Hit % by Season",37.5,"MLB Avg 37.5%","Hard %","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True)
 
         sel_s4p = st.selectbox("Season for Statcast Batted Ball", sorted(sel_seasons, reverse=True), key="bb_s")
         st.markdown('<div class="section-header">Monthly Batted Ball from Statcast</div>', unsafe_allow_html=True)
@@ -909,35 +930,33 @@ else:
     # ── TAB 5: ADVANCED ────────────────────────────────────────────────────────
     with t5:
         st.markdown('<div class="section-header">Advanced Pitching Metrics</div>', unsafe_allow_html=True)
-        adv_cols = ["Name","Season","ERA","FIP","xFIP","SIERA","ERA-","FIP-","xFIP-","WAR","LOB%","BABIP","K-BB%"]
+        adv_cols = ["Name","Season","ERA","WHIP","K/9","BB/9","K%","BB%","K-BB%","HR/9"]
         avail_adv = [c for c in adv_cols if c in all_fg.columns]
         adv_tbl = pd.concat([p_seasons(p) for p in PLAYERS])[avail_adv].sort_values(["Name","Season"])
-        afmt = {c:"{:.2f}" for c in ["ERA","FIP","xFIP","SIERA","BABIP"]}
-        afmt.update({c:"{:.1f}" for c in ["ERA-","FIP-","xFIP-","WAR","LOB%","K-BB%"]})
+        afmt = {c:"{:.2f}" for c in ["ERA","WHIP"]}
+        afmt.update({c:"{:.1f}" for c in ["K/9","BB/9","K%","BB%","K-BB%","HR/9"]})
         st.dataframe(adv_tbl.style.format(afmt,na_rep="N/A")
-                                  .background_gradient(subset=[c for c in ["ERA","FIP","xFIP","SIERA"] if c in adv_tbl.columns], cmap="RdYlGn_r")
-                                  .background_gradient(subset=[c for c in ["WAR","K-BB%"] if c in adv_tbl.columns], cmap="RdYlGn"),
+                                  .background_gradient(subset=[c for c in ["ERA","WHIP","HR/9"] if c in adv_tbl.columns], cmap="RdYlGn_r")
+                                  .background_gradient(subset=[c for c in ["K%","K-BB%","K/9"] if c in adv_tbl.columns], cmap="RdYlGn"),
                      use_container_width=True, hide_index=True)
+        st.info("FIP, xFIP, SIERA, WAR are FanGraphs-only metrics. "
+                "Visit fangraphs.com for those advanced indicators.")
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         c1,c2 = st.columns(2)
         with c1:
-            if "xFIP" in all_fg.columns:
-                st.plotly_chart(season_bar("xFIP","xFIP by Season (lower=better)",
-                    4.10,"MLB Avg (4.10)","xFIP","{:.2f}"), use_container_width=True)
+            st.plotly_chart(season_bar("ERA","ERA by Season (lower=better)",
+                4.20,"MLB Avg (4.20)","ERA","{:.2f}"), use_container_width=True)
         with c2:
-            if "SIERA" in all_fg.columns:
-                st.plotly_chart(season_bar("SIERA","SIERA by Season (lower=better)",
-                    4.10,"MLB Avg (4.10)","SIERA","{:.2f}"), use_container_width=True)
+            st.plotly_chart(season_bar("K/9","K/9 by Season (higher=better)",
+                9.0,"MLB Avg (9.0)","K/9","{:.1f}"), use_container_width=True)
         c3,c4 = st.columns(2)
         with c3:
-            if "LOB%" in all_fg.columns:
-                st.plotly_chart(season_bar("LOB%","LOB% by Season (strand rate)",
-                    72.0,"MLB Avg 72%","LOB %","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("WHIP","WHIP by Season (lower=better)",
+                1.28,"MLB Avg (1.28)","WHIP","{:.3f}"), use_container_width=True)
         with c4:
-            if "K-BB%" in all_fg.columns:
-                st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",
-                    14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",
+                14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True)
 
         sel_s5p = st.selectbox("Season for Statcast Velocity Trends", sorted(sel_seasons,reverse=True), key="adv_s")
         sc_adv = {}
