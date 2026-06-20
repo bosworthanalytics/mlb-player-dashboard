@@ -911,7 +911,7 @@ else:
         with c1:
             st.plotly_chart(season_bar("HR/9","HR/9 by Season",1.2,"MLB Avg (1.2)","HR/9","{:.1f}"), use_container_width=True, config=PLOT_CFG)
         with c2:
-            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG)
+            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG, key="kbb_bb_tab")
 
         sel_s4p = st.selectbox("Season for Statcast Batted Ball", sorted(sel_seasons, reverse=True), key="bb_s")
         st.markdown('<div class="section-header">Monthly Batted Ball from Statcast</div>', unsafe_allow_html=True)
@@ -962,7 +962,7 @@ else:
                 1.28,"MLB Avg (1.28)","WHIP","{:.3f}"), use_container_width=True, config=PLOT_CFG)
         with c4:
             st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",
-                14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG)
+                14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG, key="kbb_adv_tab")
 
         sel_s5p = st.selectbox("Season for Statcast Velocity Trends", sorted(sel_seasons,reverse=True), key="adv_s")
         sc_adv = {}
