@@ -89,7 +89,9 @@ LAYOUT = dict(
     margin=dict(l=16, r=16, t=50, b=16),
     xaxis=dict(gridcolor=LINE_CLR, zerolinecolor=LINE_CLR),
     yaxis=dict(gridcolor=LINE_CLR, zerolinecolor=LINE_CLR),
+    dragmode=False,
 )
+PLOT_CFG = {"displayModeBar": False, "scrollZoom": False, "doubleClick": False}
 def apply_layout(fig, **kw):
     fig.update_layout(**{**LAYOUT, **kw}); return fig
 
@@ -540,9 +542,9 @@ with t1:
         st.markdown('<div class="section-header">Latest Season Performance Index</div>', unsafe_allow_html=True)
         st.plotly_chart(perf_index_bar(hit_metrics, HIT_AVG,
                         "Latest Season Stats vs. MLB Average — 100 = League Average"),
-                        use_container_width=True)
+                        use_container_width=True, config=PLOT_CFG)
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.plotly_chart(season_bar("OPS","OPS by Season",0.720,"MLB Avg (.720)","OPS"), use_container_width=True)
+        st.plotly_chart(season_bar("OPS","OPS by Season",0.720,"MLB Avg (.720)","OPS"), use_container_width=True, config=PLOT_CFG)
 
     else:  # Pitchers
         pit_metrics = [
@@ -557,9 +559,9 @@ with t1:
         st.markdown('<div class="section-header">Latest Season Performance Index</div>', unsafe_allow_html=True)
         st.plotly_chart(perf_index_bar(pit_metrics, PIT_AVG,
                         "Latest Season Pitching Index vs. MLB Average — 100 = League Average"),
-                        use_container_width=True)
+                        use_container_width=True, config=PLOT_CFG)
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.plotly_chart(season_bar("ERA","ERA by Season",4.20,"MLB Avg (4.20)","ERA","{:.2f}"), use_container_width=True)
+        st.plotly_chart(season_bar("ERA","ERA by Season",4.20,"MLB Avg (4.20)","ERA","{:.2f}"), use_container_width=True, config=PLOT_CFG)
 
     # Scouting grades (if available for selected players)
     has_grades = any(p in SCOUTING for p in PLAYERS)
@@ -588,7 +590,7 @@ with t1:
                                 tickvals=[20,30,40,50,60,70,80],
                                 title="Grade (20=Poor · 50=Avg · 80=Elite)"),
                      legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1))
-        st.plotly_chart(fig_g, use_container_width=True)
+        st.plotly_chart(fig_g, use_container_width=True, config=PLOT_CFG)
         st.markdown("""<div class="info-box">
         <b style="color:#C4A962">20-80 Scale:</b> &nbsp;
         20=Poor &nbsp;·&nbsp; 40=Below Avg &nbsp;·&nbsp; 50=Average &nbsp;·&nbsp;
@@ -620,17 +622,17 @@ if mode == "Hitters":
             c1,c2 = st.columns(2)
             with c1:
                 st.plotly_chart(monthly_line(monthly_hit,"AVG","AVG by Month",
-                    0.248,"MLB Avg (.248)","AVG",sel_s), use_container_width=True)
+                    0.248,"MLB Avg (.248)","AVG",sel_s), use_container_width=True, config=PLOT_CFG)
             with c2:
                 st.plotly_chart(monthly_line(monthly_hit,"OPS","OPS by Month",
-                    0.720,"MLB Avg (.720)","OPS",sel_s), use_container_width=True)
+                    0.720,"MLB Avg (.720)","OPS",sel_s), use_container_width=True, config=PLOT_CFG)
             c3,c4 = st.columns(2)
             with c3:
                 st.plotly_chart(monthly_line(monthly_hit,"HR","Home Runs by Month",
-                    None,None,"HR",sel_s), use_container_width=True)
+                    None,None,"HR",sel_s), use_container_width=True, config=PLOT_CFG)
             with c4:
                 st.plotly_chart(monthly_line(monthly_hit,"OBP","OBP by Month",
-                    0.320,"MLB Avg (.320)","OBP",sel_s), use_container_width=True)
+                    0.320,"MLB Avg (.320)","OBP",sel_s), use_container_width=True, config=PLOT_CFG)
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Season Totals</div>', unsafe_allow_html=True)
@@ -662,17 +664,17 @@ if mode == "Hitters":
         c1,c2 = st.columns(2)
         with c1:
             st.plotly_chart(monthly_line(sc_monthly,"EV_avg","Avg Exit Velocity by Month",
-                88.5,"MLB Avg 88.5","mph",sel_s3), use_container_width=True)
+                88.5,"MLB Avg 88.5","mph",sel_s3), use_container_width=True, config=PLOT_CFG)
         with c2:
             st.plotly_chart(monthly_line(sc_monthly,"xBA","xBA by Month",
-                0.248,"MLB Avg (.248)","xBA",sel_s3), use_container_width=True)
+                0.248,"MLB Avg (.248)","xBA",sel_s3), use_container_width=True, config=PLOT_CFG)
         c3,c4 = st.columns(2)
         with c3:
             st.plotly_chart(monthly_line(sc_monthly,"HardHit_pct","Hard Hit % by Month",
-                37.5,"MLB Avg 37.5%","Hard Hit %",sel_s3), use_container_width=True)
+                37.5,"MLB Avg 37.5%","Hard Hit %",sel_s3), use_container_width=True, config=PLOT_CFG)
         with c4:
             st.plotly_chart(monthly_line(sc_monthly,"xwOBA","xwOBA by Month",
-                0.317,"MLB Avg (.317)","xwOBA",sel_s3), use_container_width=True)
+                0.317,"MLB Avg (.317)","xwOBA",sel_s3), use_container_width=True, config=PLOT_CFG)
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Exit Velocity & Hard Hit % — Career by Season</div>', unsafe_allow_html=True)
@@ -707,7 +709,7 @@ if mode == "Hitters":
                 apply_layout(fig_ev, barmode="group", title="Avg Exit Velocity by Season",
                              yaxis_title="mph",
                              legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1))
-                c5.plotly_chart(fig_ev, use_container_width=True)
+                c5.plotly_chart(fig_ev, use_container_width=True, config=PLOT_CFG)
                 fig_hh = go.Figure()
                 for p in PLAYERS:
                     sub = sc_career[sc_career["Player"]==p].dropna(subset=["HardHit_pct"])
@@ -721,7 +723,7 @@ if mode == "Hitters":
                 apply_layout(fig_hh, barmode="group", title="Hard Hit % by Season",
                              yaxis_title="%",
                              legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1))
-                c6.plotly_chart(fig_hh, use_container_width=True)
+                c6.plotly_chart(fig_hh, use_container_width=True, config=PLOT_CFG)
 
     # ── TAB 4: PLATE DISCIPLINE ────────────────────────────────────────────────
     with t4:
@@ -753,18 +755,18 @@ if mode == "Hitters":
         c1,c2 = st.columns(2)
         with c1:
             st.plotly_chart(monthly_line(sc_disc,"Chase_pct","Chase Rate by Month (lower=better)",
-                30.0,"MLB Avg 30%","Chase %",sel_s4), use_container_width=True)
+                30.0,"MLB Avg 30%","Chase %",sel_s4), use_container_width=True, config=PLOT_CFG)
         with c2:
             st.plotly_chart(monthly_line(sc_disc,"SwStr_pct","Swinging Strike % by Month (lower=better)",
-                10.8,"MLB Avg 10.8%","SwStr %",sel_s4), use_container_width=True)
+                10.8,"MLB Avg 10.8%","SwStr %",sel_s4), use_container_width=True, config=PLOT_CFG)
         c3,c4 = st.columns(2)
         with c3:
             st.plotly_chart(monthly_line(sc_disc,"ZContact_pct","Zone Contact % by Month (higher=better)",
-                84.0,"MLB Avg 84%","Z-Contact %",sel_s4), use_container_width=True)
+                84.0,"MLB Avg 84%","Z-Contact %",sel_s4), use_container_width=True, config=PLOT_CFG)
         with c4:
             # BB% and K% from FanGraphs season data — show by season bar
             st.plotly_chart(season_bar("BB%","Walk Rate by Season (%)",
-                8.5,"MLB Avg 8.5%","BB %","{:.1f}"), use_container_width=True)
+                8.5,"MLB Avg 8.5%","BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG)
 
     # ── TAB 5: DEFENSE ─────────────────────────────────────────────────────────
     with t5:
@@ -803,17 +805,17 @@ else:
         c1,c2 = st.columns(2)
         with c1:
             st.plotly_chart(monthly_line(monthly_pit,"ERA","ERA by Month",
-                4.20,"MLB Avg (4.20)","ERA",sel_s2), use_container_width=True)
+                4.20,"MLB Avg (4.20)","ERA",sel_s2), use_container_width=True, config=PLOT_CFG)
         with c2:
             st.plotly_chart(monthly_line(monthly_pit,"WHIP","WHIP by Month",
-                1.28,"MLB Avg (1.28)","WHIP",sel_s2), use_container_width=True)
+                1.28,"MLB Avg (1.28)","WHIP",sel_s2), use_container_width=True, config=PLOT_CFG)
         c3,c4 = st.columns(2)
         with c3:
             st.plotly_chart(monthly_line(monthly_pit,"K/9","K/9 by Month",
-                9.0,"MLB Avg (9.0)","K/9",sel_s2), use_container_width=True)
+                9.0,"MLB Avg (9.0)","K/9",sel_s2), use_container_width=True, config=PLOT_CFG)
         with c4:
             st.plotly_chart(monthly_line(monthly_pit,"BB/9","BB/9 by Month (lower=better)",
-                3.1,"MLB Avg (3.1)","BB/9",sel_s2), use_container_width=True)
+                3.1,"MLB Avg (3.1)","BB/9",sel_s2), use_container_width=True, config=PLOT_CFG)
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Career Season Totals</div>', unsafe_allow_html=True)
@@ -861,7 +863,7 @@ else:
                     title=dict(text="Pitch Usage %",font=dict(color=TEXT)),
                     showlegend=False,
                 )
-                ca1.plotly_chart(fig_pie, use_container_width=True)
+                ca1.plotly_chart(fig_pie, use_container_width=True, config=PLOT_CFG)
 
             with ca2:
                 # Velocity bar
@@ -874,7 +876,7 @@ else:
                 apply_layout(fig_velo, title="Avg Velocity by Pitch Type",
                              xaxis=dict(range=[60,105],gridcolor=LINE_CLR,title="mph"),
                              height=300)
-                ca2.plotly_chart(fig_velo, use_container_width=True)
+                ca2.plotly_chart(fig_velo, use_container_width=True, config=PLOT_CFG)
 
             # Arsenal table
             disp_ars = ars[["Pitch","Usage%","Velo","Spin","xwOBA"]].rename(
@@ -904,9 +906,9 @@ else:
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         c1,c2 = st.columns(2)
         with c1:
-            st.plotly_chart(season_bar("HR/9","HR/9 by Season",1.2,"MLB Avg (1.2)","HR/9","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("HR/9","HR/9 by Season",1.2,"MLB Avg (1.2)","HR/9","{:.1f}"), use_container_width=True, config=PLOT_CFG)
         with c2:
-            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True)
+            st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG)
 
         sel_s4p = st.selectbox("Season for Statcast Batted Ball", sorted(sel_seasons, reverse=True), key="bb_s")
         st.markdown('<div class="section-header">Monthly Batted Ball from Statcast</div>', unsafe_allow_html=True)
@@ -923,10 +925,10 @@ else:
         c3,c4 = st.columns(2)
         with c3:
             st.plotly_chart(monthly_line(sc_bb,"EV_avg","Avg Exit Velocity Against by Month",
-                88.5,"MLB Avg 88.5","mph",sel_s4p), use_container_width=True)
+                88.5,"MLB Avg 88.5","mph",sel_s4p), use_container_width=True, config=PLOT_CFG)
         with c4:
             st.plotly_chart(monthly_line(sc_bb,"HardHit_pct","Hard Hit % Against by Month",
-                37.5,"MLB Avg 37.5%","Hard Hit %",sel_s4p), use_container_width=True)
+                37.5,"MLB Avg 37.5%","Hard Hit %",sel_s4p), use_container_width=True, config=PLOT_CFG)
 
     # ── TAB 5: ADVANCED ────────────────────────────────────────────────────────
     with t5:
@@ -947,17 +949,17 @@ else:
         c1,c2 = st.columns(2)
         with c1:
             st.plotly_chart(season_bar("ERA","ERA by Season (lower=better)",
-                4.20,"MLB Avg (4.20)","ERA","{:.2f}"), use_container_width=True)
+                4.20,"MLB Avg (4.20)","ERA","{:.2f}"), use_container_width=True, config=PLOT_CFG)
         with c2:
             st.plotly_chart(season_bar("K/9","K/9 by Season (higher=better)",
-                9.0,"MLB Avg (9.0)","K/9","{:.1f}"), use_container_width=True)
+                9.0,"MLB Avg (9.0)","K/9","{:.1f}"), use_container_width=True, config=PLOT_CFG)
         c3,c4 = st.columns(2)
         with c3:
             st.plotly_chart(season_bar("WHIP","WHIP by Season (lower=better)",
-                1.28,"MLB Avg (1.28)","WHIP","{:.3f}"), use_container_width=True)
+                1.28,"MLB Avg (1.28)","WHIP","{:.3f}"), use_container_width=True, config=PLOT_CFG)
         with c4:
             st.plotly_chart(season_bar("K-BB%","K-BB% by Season (higher=better)",
-                14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True)
+                14.5,"MLB Avg 14.5%","K-BB %","{:.1f}"), use_container_width=True, config=PLOT_CFG)
 
         sel_s5p = st.selectbox("Season for Statcast Velocity Trends", sorted(sel_seasons,reverse=True), key="adv_s")
         sc_adv = {}
@@ -974,10 +976,10 @@ else:
         c5,c6 = st.columns(2)
         with c5:
             st.plotly_chart(monthly_line(sc_adv,"Velo_avg","Avg Fastball Velocity by Month",
-                93.5,"MLB Avg 93.5","mph",sel_s5p), use_container_width=True)
+                93.5,"MLB Avg 93.5","mph",sel_s5p), use_container_width=True, config=PLOT_CFG)
         with c6:
             st.plotly_chart(monthly_line(sc_adv,"SwStr_pct","Swinging Strike % by Month (higher=better)",
-                10.8,"MLB Avg 10.8%","SwStr %",sel_s5p), use_container_width=True)
+                10.8,"MLB Avg 10.8%","SwStr %",sel_s5p), use_container_width=True, config=PLOT_CFG)
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
