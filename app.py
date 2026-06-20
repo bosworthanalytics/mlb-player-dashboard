@@ -808,6 +808,96 @@ def monthly_line(monthly_dict, col, title, ref_val, ref_label, y_title, sel_seas
     ech(opts, height=height)
 
 # ════════════════════════════════════════════════════════════════════════════════
+# SHARED: GM Summary (auto-narrative, Overview tab)
+# ════════════════════════════════════════════════════════════════════════════════
+def gm_summary():
+    def _val(player, col):
+        r = p_latest(player)
+        return float(r[col]) if r is not None and col in r.index and pd.notna(r.get(col)) else None
+
+    bullets = []
+    if mode == "Hitters":
+        # Bullet 1: Offensive value via wRC+
+        wrc = {p: _val(p, "wRC+") for p in PLAYERS}
+        ops = {p: _val(p, "OPS")  for p in PLAYERS}
+        if all(v is not None for v in wrc.values()):
+            best = max(wrc, key=lambda x: wrc[x])
+            other = [p for p in PLAYERS if p != best][0]
+            bullets.append(
+                f"**Offensive value:** {best} is the stronger offensive player — wRC+ "
+                f"**{wrc[best]:.0f}** vs. {wrc[other]:.0f} for {other} "
+                f"(100 = league average; each point above 100 = 1% better than the average hitter).")
+        elif all(v is not None for v in ops.values()):
+            best = max(ops, key=lambda x: ops[x])
+            other = [p for p in PLAYERS if p != best][0]
+            bullets.append(
+                f"**Offensive value:** {best} leads in OPS ({ops[best]:.3f} vs. {ops[other]:.3f} for {other}).")
+
+        # Bullet 2: Plate discipline
+        bb = {p: _val(p, "BB%") for p in PLAYERS}
+        k  = {p: _val(p, "K%")  for p in PLAYERS}
+        if all(v is not None for v in bb.values()) and all(v is not None for v in k.values()):
+            disc = max(bb, key=lambda x: bb[x])
+            k_str = " / ".join(f"{p}: {k[p]:.1f}%" for p in PLAYERS)
+            bullets.append(
+                f"**Plate discipline:** {disc} draws more walks ({bb[disc]:.1f}% BB rate). "
+                f"Strikeout rates — {k_str} (MLB avg ~22%).")
+
+        # Bullet 3: WAR / dollar value
+        war = {p: _val(p, "WAR")     for p in PLAYERS}
+        dol = {p: _val(p, "Dollars") for p in PLAYERS}
+        if all(v is not None for v in war.values()):
+            best = max(war, key=lambda x: war[x])
+            other = [p for p in PLAYERS if p != best][0]
+            dol_str = f" (est. market value ~${dol[best]:.1f}M)" if dol.get(best) else ""
+            bullets.append(
+                f"**Win value:** {best} generated **{war[best]:.1f} fWAR** last season{dol_str}, "
+                f"vs. {war[other]:.1f} WAR for {other}. "
+                f"A 2-WAR player is a solid regular; 5+ WAR is All-Star caliber.")
+
+    else:  # Pitchers
+        # Bullet 1: ERA vs FIP per player
+        era = {p: _val(p, "ERA") for p in PLAYERS}
+        fip = {p: _val(p, "FIP") for p in PLAYERS}
+        for p in PLAYERS:
+            if era.get(p) is not None and fip.get(p) is not None:
+                gap = fip[p] - era[p]
+                verdict = ("ERA outpacing peripherals — positive regression likely" if gap > 0.30
+                           else "underperforming peripherals — negative regression likely" if gap < -0.30
+                           else "ERA and peripherals in line — results look sustainable")
+                bullets.append(
+                    f"**{p} — ERA vs. FIP:** {era[p]:.2f} ERA / {fip[p]:.2f} FIP — *{verdict}*.")
+
+        # Bullet 2: Strikeout stuff
+        k9 = {p: _val(p, "K/9") for p in PLAYERS}
+        if all(v is not None for v in k9.values()):
+            best = max(k9, key=lambda x: k9[x])
+            other = [p for p in PLAYERS if p != best][0]
+            bullets.append(
+                f"**Swing-and-miss:** {best} leads in strikeouts at **{k9[best]:.1f} K/9** "
+                f"vs. {k9[other]:.1f} for {other} (MLB avg ~9.0).")
+
+        # Bullet 3: WAR
+        war = {p: _val(p, "WAR")     for p in PLAYERS}
+        dol = {p: _val(p, "Dollars") for p in PLAYERS}
+        if all(v is not None for v in war.values()):
+            best = max(war, key=lambda x: war[x])
+            other = [p for p in PLAYERS if p != best][0]
+            dol_str = f" (~${dol[best]:.1f}M market value)" if dol.get(best) else ""
+            bullets.append(
+                f"**Win value:** {best} was worth **{war[best]:.1f} fWAR**{dol_str} "
+                f"vs. {war[other]:.1f} for {other}.")
+
+    if not bullets:
+        return
+    st.markdown('<div class="section-header">GM Summary</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="info-box">' +
+        "".join(f"<p style='margin:4px 0'>• {b}</p>" for b in bullets) +
+        "</div>", unsafe_allow_html=True)
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════════════════════
 # TAB 1 — OVERVIEW (both modes)
 # ════════════════════════════════════════════════════════════════════════════════
 with t1:
@@ -901,96 +991,6 @@ with t1:
         20=Poor &nbsp;·&nbsp; 40=Below Avg &nbsp;·&nbsp; 50=Average &nbsp;·&nbsp;
         55=Above Avg &nbsp;·&nbsp; 60=Plus &nbsp;·&nbsp; 70=Well Above Avg &nbsp;·&nbsp; 80=Elite
         </div>""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SHARED: GM Summary (auto-narrative, Overview tab)
-# ════════════════════════════════════════════════════════════════════════════════
-def gm_summary():
-    def _val(player, col):
-        r = p_latest(player)
-        return float(r[col]) if r is not None and col in r.index and pd.notna(r.get(col)) else None
-
-    bullets = []
-    if mode == "Hitters":
-        # Bullet 1: Offensive value via wRC+
-        wrc = {p: _val(p, "wRC+") for p in PLAYERS}
-        ops = {p: _val(p, "OPS")  for p in PLAYERS}
-        if all(v is not None for v in wrc.values()):
-            best = max(wrc, key=lambda x: wrc[x])
-            other = [p for p in PLAYERS if p != best][0]
-            bullets.append(
-                f"**Offensive value:** {best} is the stronger offensive player — wRC+ "
-                f"**{wrc[best]:.0f}** vs. {wrc[other]:.0f} for {other} "
-                f"(100 = league average; each point above 100 = 1% better than the average hitter).")
-        elif all(v is not None for v in ops.values()):
-            best = max(ops, key=lambda x: ops[x])
-            other = [p for p in PLAYERS if p != best][0]
-            bullets.append(
-                f"**Offensive value:** {best} leads in OPS ({ops[best]:.3f} vs. {ops[other]:.3f} for {other}).")
-
-        # Bullet 2: Plate discipline
-        bb = {p: _val(p, "BB%") for p in PLAYERS}
-        k  = {p: _val(p, "K%")  for p in PLAYERS}
-        if all(v is not None for v in bb.values()) and all(v is not None for v in k.values()):
-            disc = max(bb, key=lambda x: bb[x])
-            k_str = " / ".join(f"{p}: {k[p]:.1f}%" for p in PLAYERS)
-            bullets.append(
-                f"**Plate discipline:** {disc} draws more walks ({bb[disc]:.1f}% BB rate). "
-                f"Strikeout rates — {k_str} (MLB avg ~22%).")
-
-        # Bullet 3: WAR / dollar value
-        war = {p: _val(p, "WAR")     for p in PLAYERS}
-        dol = {p: _val(p, "Dollars") for p in PLAYERS}
-        if all(v is not None for v in war.values()):
-            best = max(war, key=lambda x: war[x])
-            other = [p for p in PLAYERS if p != best][0]
-            dol_str = f" (est. market value ~${dol[best]:.1f}M)" if dol.get(best) else ""
-            bullets.append(
-                f"**Win value:** {best} generated **{war[best]:.1f} fWAR** last season{dol_str}, "
-                f"vs. {war[other]:.1f} WAR for {other}. "
-                f"A 2-WAR player is a solid regular; 5+ WAR is All-Star caliber.")
-
-    else:  # Pitchers
-        # Bullet 1: ERA vs FIP
-        era = {p: _val(p, "ERA") for p in PLAYERS}
-        fip = {p: _val(p, "FIP") for p in PLAYERS}
-        for p in PLAYERS:
-            if era.get(p) is not None and fip.get(p) is not None:
-                gap = fip[p] - era[p]
-                verdict = ("ERA outpacing peripherals — positive regression likely" if gap > 0.30
-                           else "underperforming peripherals — negative regression likely" if gap < -0.30
-                           else "ERA and peripherals in line — results look sustainable")
-                bullets.append(
-                    f"**{p} — ERA vs. FIP:** {era[p]:.2f} ERA / {fip[p]:.2f} FIP — *{verdict}*.")
-
-        # Bullet 2: K stuff
-        k9 = {p: _val(p, "K/9") for p in PLAYERS}
-        if all(v is not None for v in k9.values()):
-            best = max(k9, key=lambda x: k9[x])
-            other = [p for p in PLAYERS if p != best][0]
-            bullets.append(
-                f"**Swing-and-miss:** {best} leads in strikeouts at **{k9[best]:.1f} K/9** "
-                f"vs. {k9[other]:.1f} for {other} (MLB avg ~9.0).")
-
-        # Bullet 3: WAR
-        war = {p: _val(p, "WAR")     for p in PLAYERS}
-        dol = {p: _val(p, "Dollars") for p in PLAYERS}
-        if all(v is not None for v in war.values()):
-            best = max(war, key=lambda x: war[x])
-            other = [p for p in PLAYERS if p != best][0]
-            dol_str = f" (~${dol[best]:.1f}M market value)" if dol.get(best) else ""
-            bullets.append(
-                f"**Win value:** {best} was worth **{war[best]:.1f} fWAR**{dol_str} "
-                f"vs. {war[other]:.1f} for {other}.")
-
-    if not bullets:
-        return
-    st.markdown('<div class="section-header">GM Summary</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="info-box">' +
-        "".join(f"<p style='margin:4px 0'>• {b}</p>" for b in bullets) +
-        "</div>", unsafe_allow_html=True)
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
 # SHARED: Free Agent tab (called from both hitter and pitcher branches)
