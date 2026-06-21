@@ -1751,7 +1751,7 @@ else:
                     "title": {"text":"Avg Exit Velocity by Pitch (mph)","textStyle":{"color":TEXT,"fontSize":13},"left":"center","top":4},
                     "tooltip": {"trigger":"axis","backgroundColor":CARD_BG,"borderColor":LINE_CLR,"textStyle":{"color":TEXT}},
                     "grid": {"left":"3%","right":"18%","top":"15%","bottom":"10%","containLabel":True},
-                    "xAxis": {"type":"value","min":75,"max":100,
+                    "xAxis": {"type":"value","min":65,"max":90,
                               "splitLine":{"lineStyle":{"color":LINE_CLR}},
                               "axisLabel":{"color":SUBTEXT},"axisLine":{"lineStyle":{"color":LINE_CLR}}},
                     "yAxis": {"type":"category","data":pitches,
