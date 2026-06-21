@@ -34,7 +34,7 @@ st.set_page_config(
 # ── Constants ──────────────────────────────────────────────────────────────────
 ALL_SEASONS   = [2023, 2024, 2025, 2026]
 PA_COL        = "#B0C4DE"   # Player A — light steel silver
-PB_COL        = "#2ECC9B"   # Player B — neptune green
+PB_COL        = "#00C4B3"   # Player B — Pantone 3262 C
 GOLD          = "#C4A962"
 CARD_BG       = "#1A1D2E"
 LINE_CLR      = "#2D3250"
@@ -411,7 +411,7 @@ def get_fa_info(mlbam_id):
             svc_float  = float(_date.today().year - debut_year)
             fa_year    = debut_year + 6
         if svc_float >= 6.0:
-            status, sc = "FA Eligible", "#2ECC9B"
+            status, sc = "FA Eligible", "#00C4B3"
         elif svc_float >= 3.0:
             arb_n = min(3, int(svc_float) - 2)
             status, sc = f"Arb {arb_n} Eligible", "#C4A962"
@@ -930,7 +930,7 @@ def generate_pdf():
     C_SUB  = (110, 120, 140)
     C_ALT  = (243, 246, 252)
     C_PA   = (70,  120, 195)
-    C_PB   = (22,  148, 105)
+    C_PB   = (0,   196, 179)
     C_LINE = (210, 215, 228)
 
     class _PDF(FPDF):
