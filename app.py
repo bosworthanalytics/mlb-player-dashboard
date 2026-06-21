@@ -728,7 +728,7 @@ def perf_index_bar(metrics, avgs, title):
     }
     ech(opts, height=max(300, len(metrics) * 58))
 
-def season_bar(col, title, ref_val, ref_label, y_title, fmt="{:.3f}", height=340):
+def season_bar(col, title, ref_val, ref_label, y_title, fmt="{:.3f}", height=340, round_to=None):
     season_set = sorted({
         str(int(r["Season"]))
         for p in PLAYERS
@@ -737,7 +737,7 @@ def season_bar(col, title, ref_val, ref_label, y_title, fmt="{:.3f}", height=340
     series = []
     for player in PLAYERS:
         s = p_seasons(player).dropna(subset=[col])
-        sm = {str(int(r["Season"])): float(r[col]) for _, r in s.iterrows()}
+        sm = {str(int(r["Season"])): (round(float(r[col]), round_to) if round_to is not None else float(r[col])) for _, r in s.iterrows()}
         data = [sm.get(ss) for ss in season_set]
         color = COLORS[player]
         ser = {
@@ -1181,7 +1181,7 @@ with t1:
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         ov1, ov2 = st.columns(2)
         with ov1:
-            season_bar("WAR","fWAR by Season (FanGraphs)",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}")
+            season_bar("WAR","fWAR by Season (FanGraphs)",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}",round_to=1)
         with ov2:
             season_bar("wRC+","wRC+ by Season",100,"MLB Avg (100)","wRC+","{:.0f}")
 
@@ -1202,7 +1202,7 @@ with t1:
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         ov1, ov2 = st.columns(2)
         with ov1:
-            season_bar("WAR","fWAR by Season (FanGraphs)",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}")
+            season_bar("WAR","fWAR by Season (FanGraphs)",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}",round_to=1)
         with ov2:
             season_bar("ERA","ERA by Season",4.20,"MLB Avg (4.20)","ERA","{:.2f}")
 
@@ -1446,7 +1446,7 @@ if mode == "Hitters":
         with h1:
             season_bar("wRC+","wRC+ by Season (park-adjusted offense)",100,"MLB Avg (100)","wRC+","{:.0f}")
         with h2:
-            season_bar("WAR","fWAR by Season",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}")
+            season_bar("WAR","fWAR by Season",2.0,"2 WAR = Solid Starter","fWAR","{:.1f}",round_to=1)
 
         # ── Platoon Splits ──────────────────────────────────────────────────────
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
