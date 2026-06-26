@@ -757,7 +757,22 @@ You can also discuss any other MLB players in general based on your training kno
                              avatar="🧑" if msg["role"] == "user" else "⚾"):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input(f"Ask about {chat_pa}, {chat_pb}, or any MLB player..."):
+    def _find_mentioned_players(msg):
+        """Return stats string for any player names detected in the message."""
+        msg_lower = msg.lower()
+        found = []
+        already = {chat_pa.lower(), chat_pb.lower()}
+        for name in chat_fg["Name"].dropna().unique():
+            if name.lower() in already:
+                continue
+            parts = [p for p in name.lower().split() if len(p) > 3]
+            if any(p in msg_lower for p in parts):
+                rows = chat_fg[chat_fg["Name"] == name].sort_values("Season", ascending=False)
+                if not rows.empty:
+                    found.append(f"{name}: {_get_stats_str(name)}")
+        return found
+
+    if prompt := st.chat_input(f"Ask about any MLB player..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑"):
             st.markdown(prompt)
@@ -765,11 +780,15 @@ You can also discuss any other MLB players in general based on your training kno
         with st.chat_message("assistant", avatar="⚾"):
             with st.spinner("Analyzing..."):
                 try:
+                    extra = _find_mentioned_players(prompt)
+                    dynamic_sys = sys_prompt
+                    if extra:
+                        dynamic_sys += "\n\nAdditional players mentioned in this query:\n" + "\n".join(extra)
                     client = _anthropic.Anthropic(api_key=_ANT_KEY)
                     resp = client.messages.create(
                         model="claude-haiku-4-5-20251001",
-                        max_tokens=600,
-                        system=sys_prompt,
+                        max_tokens=700,
+                        system=dynamic_sys,
                         messages=[{"role": m["role"], "content": m["content"]}
                                   for m in st.session_state.chat_history],
                     )
