@@ -1428,6 +1428,381 @@ if app_mode == "Scouting Report":
         )
         st.markdown(_bullets_html, unsafe_allow_html=True)
 
+    # ── MLB Rankings ─────────────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">MLB Rankings</div>', unsafe_allow_html=True)
+    _rank_season = int(sn_df["Season"].max()) if not sn_df.empty else int(max(sel_seasons))
+    _rank_df = all_fg[all_fg["Season"] == _rank_season].copy()
+    if mode == "Pitchers":
+        _rq = pd.to_numeric(_rank_df.get("IP", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        _rank_df = _rank_df[_rq >= 20]
+        _rank_defs = [
+            ("ERA",   "ERA",   True,  "{:.2f}"),
+            ("WHIP",  "WHIP",  True,  "{:.2f}"),
+            ("K%",    "K%",    False, "{:.1f}%"),
+            ("BB%",   "BB%",   True,  "{:.1f}%"),
+            ("K/9",   "K/9",   False, "{:.1f}"),
+            ("K-BB%", "K-BB%", False, "{:.1f}%"),
+            ("FIP",   "FIP",   True,  "{:.2f}"),
+            ("IP",    "IP",    False, "{:.1f}"),
+            ("WAR",   "WAR",   False, "{:.1f}"),
+        ]
+    else:
+        _rq = pd.to_numeric(_rank_df.get("PA", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        _rank_df = _rank_df[_rq >= 100]
+        _rank_defs = [
+            ("AVG",  "AVG",  False, "{:.3f}"),
+            ("OBP",  "OBP",  False, "{:.3f}"),
+            ("SLG",  "SLG",  False, "{:.3f}"),
+            ("OPS",  "OPS",  False, "{:.3f}"),
+            ("HR",   "HR",   False, "{:.0f}"),
+            ("RBI",  "RBI",  False, "{:.0f}"),
+            ("SB",   "SB",   False, "{:.0f}"),
+            ("wRC+", "wRC+", False, "{:.0f}"),
+            ("K%",   "K%",   True,  "{:.1f}%"),
+            ("BB%",  "BB%",  False, "{:.1f}%"),
+            ("WAR",  "WAR",  False, "{:.1f}"),
+        ]
+    _rank_cards = []
+    for _sc2, _sn2, _lib2, _fmt2 in _rank_defs:
+        if _sc2 not in _rank_df.columns: continue
+        _tmp2 = (_rank_df[["Name", _sc2]].dropna()
+                 .sort_values(_sc2, ascending=_lib2)
+                 .reset_index(drop=True))
+        _pm2 = _tmp2[_tmp2["Name"] == sr_player]
+        if _pm2.empty: continue
+        _val2 = float(_pm2.iloc[0][_sc2])
+        _rpos2 = int(_pm2.index[0]) + 1
+        _tot2  = len(_tmp2)
+        _pct2  = round((_tot2 - _rpos2) / _tot2 * 100)
+        _rank_cards.append((_sn2, _val2, _rpos2, _tot2, _pct2, _fmt2))
+
+    def _pct_clr(p):
+        if p >= 90: return "#00C851"
+        if p >= 75: return "#8BC34A"
+        if p >= 50: return "#8B9EC4"
+        if p >= 25: return "#FFA726"
+        return "#EF5350"
+
+    if _rank_cards:
+        _rc_html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">'
+        for _sn2, _val2, _rpos2, _tot2, _pct2, _fmt2 in _rank_cards:
+            _cc = _pct_clr(_pct2)
+            _vd = _fmt2.format(_val2)
+            _rc_html += (
+                f'<div style="background:#0F1E32;border:1px solid #1A2E47;border-top:3px solid {_cc};'
+                f'border-radius:10px;padding:13px 16px;min-width:110px;flex:1">'
+                f'<div style="font-size:.6rem;font-weight:700;color:#C8102E;'
+                f'letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">{_sn2}</div>'
+                f'<div style="font-size:1.55rem;font-weight:900;color:#F4F8FF;'
+                f'font-family:monospace;line-height:1.1">{_vd}</div>'
+                f'<div style="font-size:.7rem;color:{_cc};font-weight:700;margin-top:6px">'
+                f'#{_rpos2} of {_tot2}</div>'
+                f'<div style="margin-top:5px;background:#0A1525;border-radius:3px;height:4px">'
+                f'<div style="width:{_pct2}%;background:{_cc};height:4px;border-radius:3px"></div></div>'
+                f'<div style="font-size:.6rem;color:#8B9EC4;margin-top:3px">{_pct2}th pct · {_rank_season}</div>'
+                f'</div>'
+            )
+        _rc_html += '</div>'
+        st.markdown(_rc_html, unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div style="color:#8B9EC4;font-size:.85rem;padding:8px 0">'
+            'No ranking data available (need ≥20 IP / ≥100 PA in selected season).</div>',
+            unsafe_allow_html=True
+        )
+
+    # ── Zone Analysis + Pitch Maps (Statcast) ────────────────────────────────────
+    if mid and HAS_PB:
+        _zone_raw = pd.DataFrame()
+        _zone_season = None
+        for _zs in sorted(sel_seasons, reverse=True):
+            _ztmp = (get_statcast_pitcher_raw(mid, _zs)
+                     if mode == "Pitchers"
+                     else get_statcast_batter_raw(mid, _zs))
+            if not _ztmp.empty:
+                _zone_raw = _ztmp
+                _zone_season = _zs
+                break
+
+        if not _zone_raw.empty and "plate_x" in _zone_raw.columns:
+            st.markdown(
+                f'<div class="section-header">Zone Analysis '
+                f'<span style="color:#8B9EC4;font-size:.76rem;font-weight:400">'
+                f'({_zone_season} Statcast — catcher\'s view)</span></div>',
+                unsafe_allow_html=True
+            )
+
+            _NX, _NZ = 5, 5
+            _XE = np.linspace(-1.0, 1.0, _NX + 1)
+            _ZE = np.linspace(1.5, 3.5, _NZ + 1)
+
+            def _bin_sc(df):
+                df = df.dropna(subset=["plate_x","plate_z"]).copy()
+                df = df[df["plate_x"].between(-1.0, 1.0) & df["plate_z"].between(1.5, 3.5)]
+                df["_xi"] = pd.cut(df["plate_x"], bins=_XE, labels=False, include_lowest=True)
+                df["_zi"] = pd.cut(df["plate_z"], bins=_ZE, labels=False, include_lowest=True)
+                return df.dropna(subset=["_xi","_zi"])
+
+            def _zone_vals(binned, fn, min_n=3):
+                out = []
+                for xi in range(_NX):
+                    for zi in range(_NZ):
+                        g = binned[(binned["_xi"]==xi) & (binned["_zi"]==zi)]
+                        v = fn(g) if len(g) >= min_n else None
+                        if v is not None:
+                            out.append([xi, zi, v])
+                return out
+
+            def _zone_chart(data, title, vmin, vmax, colors):
+                return {
+                    "backgroundColor": CARD_BG,
+                    "title": {"text": title, "left": "center", "top": 3,
+                              "textStyle": {"color": TEXT, "fontSize": 11, "fontWeight": "bold"}},
+                    "grid": {"top": "17%", "bottom": "3%", "left": "3%", "right": "3%"},
+                    "xAxis": {"type":"category","data":list(range(_NX)),
+                              "axisLabel":{"show":False},"axisLine":{"show":False},
+                              "axisTick":{"show":False},"splitLine":{"show":False}},
+                    "yAxis": {"type":"category","data":list(range(_NZ)),
+                              "axisLabel":{"show":False},"axisLine":{"show":False},
+                              "axisTick":{"show":False},"splitLine":{"show":False}},
+                    "visualMap": {"min":vmin,"max":vmax,"show":False,
+                                  "inRange":{"color":colors}},
+                    "series": [{"type":"heatmap","data":data,
+                                "label":{"show":True,"color":"#FFFFFF",
+                                         "fontSize":9,"fontWeight":"bold"},
+                                "itemStyle":{"borderWidth":3,"borderColor":CARD_BG}}],
+                }
+
+            _SWINGS = {"swinging_strike","swinging_strike_blocked","foul","foul_tip",
+                       "hit_into_play","foul_bunt","missed_bunt"}
+            _WHIFFS = {"swinging_strike","swinging_strike_blocked"}
+            _HITS   = {"single","double","triple","home_run"}
+            _AB_EV  = {"single","double","triple","home_run","field_out","strikeout",
+                       "grounded_into_double_play","double_play","force_out",
+                       "fielders_choice","fielders_choice_out","strikeout_double_play"}
+
+            def _f_density(g): return int(len(g))
+            def _f_whiff(g):
+                sw = g["description"].isin(_SWINGS).sum()
+                wh = g["description"].isin(_WHIFFS).sum()
+                return round(wh/sw*100, 1) if sw >= 3 else None
+            def _f_ba(g):
+                ab = g[g["events"].isin(_AB_EV)]
+                if len(ab) < 2: return None
+                return round(g["events"].isin(_HITS).sum()/len(ab), 3)
+            def _f_xwoba(g):
+                x = g["estimated_woba_using_speedangle"].dropna()
+                return round(float(x.mean()), 3) if len(x) >= 3 else None
+
+            _binned_all = _bin_sc(_zone_raw)
+            _d_dens  = _zone_vals(_binned_all, _f_density, 1)
+            _d_whiff = _zone_vals(_binned_all, _f_whiff)
+            _d_third = _zone_vals(_binned_all, _f_ba if mode=="Pitchers" else _f_xwoba)
+
+            _zc1, _zc2, _zc3 = st.columns(3)
+            with _zc1:
+                if _d_dens:
+                    _dmax = max(d[2] for d in _d_dens)
+                    ech(_zone_chart(_d_dens,"Pitch Density",0,_dmax,[CARD_BG,"#C8102E"]),height=240)
+            with _zc2:
+                if _d_whiff:
+                    ech(_zone_chart(_d_whiff,"Whiff Rate %",0,50,
+                        [CARD_BG,"#C8102E"] if mode=="Pitchers" else [CARD_BG,"#00BFFF"]),height=240)
+                else:
+                    st.caption("Not enough swing data for whiff map.")
+            with _zc3:
+                if _d_third:
+                    _t3_title = "BA Against" if mode=="Pitchers" else "xwOBA by Zone"
+                    _t3_clrs  = [CARD_BG,"#C8102E"] if mode=="Pitchers" else [CARD_BG,"#00C851"]
+                    _t3_mm    = (0.0, 0.4) if mode=="Pitchers" else (0.2, 0.6)
+                    ech(_zone_chart(_d_third,_t3_title,*_t3_mm,_t3_clrs),height=240)
+                else:
+                    st.caption("Not enough in-play data for zone map.")
+
+            # Whiff rate and xwOBA by pitch type (pitchers) — extra pair of maps
+            if mode == "Pitchers":
+                _pt_all = (_zone_raw[_zone_raw["pitch_type"].notna()]["pitch_type"]
+                           .value_counts())
+                _pt_show = _pt_all[_pt_all >= 20].index.tolist()
+
+                if _pt_show:
+                    st.markdown('<div class="section-header">Pitch Location by Type</div>',
+                                unsafe_allow_html=True)
+                    _pt_palette = ["#C8102E","#00BFFF","#C4A962","#2ecc71",
+                                   "#FFA726","#EF5350","#8B9EC4","#B0C4DE"]
+                    for _row_start in range(0, min(len(_pt_show), 8), 4):
+                        _row_types = _pt_show[_row_start:_row_start+4]
+                        _ptcols = st.columns(len(_row_types))
+                        for _pti, _pt in enumerate(_row_types):
+                            _pt_df = _zone_raw[_zone_raw["pitch_type"] == _pt]
+                            _pt_b  = _bin_sc(_pt_df)
+                            _pt_d  = _zone_vals(_pt_b, _f_density, 1)
+                            _pt_nm = PITCH_NAMES.get(_pt, _pt)
+                            _pt_c  = _pt_palette[(_row_start+_pti) % len(_pt_palette)]
+                            if _pt_d:
+                                _pt_mx = max(v[2] for v in _pt_d)
+                                with _ptcols[_pti]:
+                                    ech(_zone_chart(
+                                        _pt_d,
+                                        f"{_pt_nm}  ({int(_pt_df.shape[0])})",
+                                        0, _pt_mx, [CARD_BG, _pt_c]
+                                    ), height=220)
+
+                # Per-pitch-type whiff rate + BA heatmaps
+                st.markdown('<div class="section-header">Whiff Rate · BA Against by Pitch Type</div>',
+                            unsafe_allow_html=True)
+                for _row_start in range(0, min(len(_pt_show), 8), 4):
+                    _row_types = _pt_show[_row_start:_row_start+4]
+                    _wcols = st.columns(len(_row_types))
+                    for _pti, _pt in enumerate(_row_types):
+                        _pt_df = _zone_raw[_zone_raw["pitch_type"] == _pt]
+                        _pt_b  = _bin_sc(_pt_df)
+                        _dw = _zone_vals(_pt_b, _f_whiff)
+                        _db = _zone_vals(_pt_b, _f_ba)
+                        _pt_nm = PITCH_NAMES.get(_pt, _pt)
+                        with _wcols[_pti]:
+                            if _dw:
+                                ech(_zone_chart(_dw,f"{_pt_nm} Whiff%",0,60,[CARD_BG,"#C8102E"]),height=200)
+                            if _db:
+                                ech(_zone_chart(_db,f"{_pt_nm} BA",0.0,0.4,[CARD_BG,"#FFA726"]),height=200)
+
+            # ── Spray Chart (Hitters only) ────────────────────────────────────────
+            if mode == "Hitters":
+                _EV_CLR = {"home_run":"#C8102E","triple":"#FFD700",
+                           "double":"#FFA726","single":"#00BFFF"}
+                _spray_df2 = _zone_raw[
+                    _zone_raw["hc_x"].notna() & _zone_raw["hc_y"].notna() &
+                    _zone_raw["events"].notna()
+                ].copy()
+                _spray_in = _spray_df2[_spray_df2["events"].isin(
+                    _HITS | {"field_out","grounded_into_double_play","double_play",
+                             "sac_fly","fielders_choice_out","force_out"}
+                )]
+                if not _spray_in.empty:
+                    st.markdown('<div class="section-header">Spray Chart</div>',
+                                unsafe_allow_html=True)
+                    _hits_list = []
+                    for _, _hr in _spray_in.iterrows():
+                        _hx2 = _hr.get("hc_x"); _hy2 = _hr.get("hc_y")
+                        if pd.isna(_hx2) or pd.isna(_hy2): continue
+                        _hits_list.append({
+                            "x": round(float(_hx2), 1),
+                            "y": round(float(_hy2), 1),
+                            "c": _EV_CLR.get(_hr.get("events",""), "#1A2E47"),
+                            "e": str(_hr.get("events",""))
+                        })
+                    _hits_js = json.dumps(_hits_list)
+                    _n1  = sum(1 for h in _hits_list if h["e"]=="single")
+                    _n2  = sum(1 for h in _hits_list if h["e"]=="double")
+                    _n3  = sum(1 for h in _hits_list if h["e"]=="triple")
+                    _nhr = sum(1 for h in _hits_list if h["e"]=="home_run")
+                    _no  = sum(1 for h in _hits_list if h["e"] not in _EV_CLR)
+
+                    _spray_html2 = f"""<!DOCTYPE html><html><head>
+<style>
+html,body{{margin:0;padding:0;background:{CARD_BG};font-family:'Inter',sans-serif}}
+#sc{{display:block;margin:0 auto}}
+.leg{{display:flex;gap:14px;justify-content:center;padding:5px 0;font-size:11px;color:#8B9EC4;flex-wrap:wrap}}
+.dot{{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}}
+</style></head><body>
+<canvas id="sc" width="380" height="360"></canvas>
+<div class="leg">
+  <span><span class="dot" style="background:#00BFFF"></span>1B ({_n1})</span>
+  <span><span class="dot" style="background:#FFA726"></span>2B ({_n2})</span>
+  <span><span class="dot" style="background:#FFD700"></span>3B ({_n3})</span>
+  <span><span class="dot" style="background:#C8102E"></span>HR ({_nhr})</span>
+  <span><span class="dot" style="background:#1A2E47;border:1px solid #2A3E57"></span>Out ({_no})</span>
+</div>
+<script>
+var cv=document.getElementById('sc'),ctx=cv.getContext('2d');
+var W=cv.width,H=cv.height,SX=W/250,SY=H/260;
+function px(x){{return x*SX;}} function py(y){{return y*SY;}}
+ctx.fillStyle='{CARD_BG}';ctx.fillRect(0,0,W,H);
+// Outfield wall
+ctx.beginPath();ctx.moveTo(px(6),py(40));
+ctx.quadraticCurveTo(px(125),py(0),px(244),py(40));
+ctx.strokeStyle='#C8102E';ctx.lineWidth=2;ctx.stroke();
+// Foul lines
+ctx.beginPath();
+ctx.moveTo(px(125),py(208));ctx.lineTo(px(6),py(40));
+ctx.moveTo(px(125),py(208));ctx.lineTo(px(244),py(40));
+ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=1.5;ctx.stroke();
+// Infield circle
+ctx.beginPath();ctx.arc(px(125),py(152),px(46),0,Math.PI*2);
+ctx.strokeStyle='#C8A06033';ctx.lineWidth=1;ctx.stroke();
+// Diamond
+var hm=[px(125),py(208)],b1=[px(172),py(161)],b2=[px(125),py(112)],b3=[px(78),py(161)];
+ctx.beginPath();
+ctx.moveTo(hm[0],hm[1]);ctx.lineTo(b1[0],b1[1]);ctx.lineTo(b2[0],b2[1]);
+ctx.lineTo(b3[0],b3[1]);ctx.closePath();
+ctx.strokeStyle='#FFFFFF55';ctx.lineWidth=1.5;ctx.stroke();
+// Bases
+[b1,b2,b3].forEach(function(b){{ctx.fillStyle='#FFFFFF88';ctx.fillRect(b[0]-4,b[1]-4,8,8);}});
+// Mound
+ctx.beginPath();ctx.arc(px(125),py(158),px(4),0,Math.PI*2);
+ctx.fillStyle='#C8A06055';ctx.fill();
+// Home plate
+ctx.beginPath();ctx.arc(px(125),py(208),px(3),0,Math.PI*2);
+ctx.fillStyle='#FFFFFF77';ctx.fill();
+// Hits
+var hits={_hits_js};
+hits.forEach(function(h){{
+  ctx.globalAlpha=0.82;
+  ctx.beginPath();ctx.arc(px(h.x),py(h.y),4,0,Math.PI*2);
+  ctx.fillStyle=h.c;ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.beginPath();ctx.arc(px(h.x),py(h.y),4,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=0.5;ctx.stroke();
+}});
+</script></body></html>"""
+
+                    _sp_col, _sp_stat = st.columns([2, 1])
+                    with _sp_col:
+                        components.html(_spray_html2, height=420)
+                    with _sp_stat:
+                        _lf = _spray_in[_spray_in["hc_x"] < 100]
+                        _cf = _spray_in[(_spray_in["hc_x"] >= 100) & (_spray_in["hc_x"] <= 150)]
+                        _rf = _spray_in[_spray_in["hc_x"] > 150]
+                        _dtot = max(len(_spray_in), 1)
+                        _dir_h = (
+                            '<div style="margin-top:20px">'
+                            '<div style="font-size:.6rem;font-weight:700;color:#C8102E;'
+                            'letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">'
+                            'Spray Direction</div>'
+                        )
+                        for _dlbl, _ddf in [("Left Field",_lf),("Center",_cf),("Right Field",_rf)]:
+                            _dp = round(len(_ddf)/_dtot*100)
+                            _dir_h += (
+                                f'<div style="margin-bottom:9px">'
+                                f'<div style="display:flex;justify-content:space-between;'
+                                f'font-size:.74rem;color:#8B9EC4;margin-bottom:3px">'
+                                f'<span>{_dlbl}</span>'
+                                f'<span style="color:#F4F8FF">{_dp}%</span></div>'
+                                f'<div style="background:#0A1525;border-radius:3px;height:5px">'
+                                f'<div style="width:{_dp}%;background:#00BFFF;height:5px;border-radius:3px"></div>'
+                                f'</div></div>'
+                            )
+                        _dir_h += (
+                            '<div style="margin-top:14px;font-size:.6rem;font-weight:700;color:#C8102E;'
+                            'letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">'
+                            'Hit Breakdown</div>'
+                        )
+                        for _et, _ec, _el in [("home_run","#C8102E","HR"),
+                                              ("triple","#FFD700","3B"),
+                                              ("double","#FFA726","2B"),
+                                              ("single","#00BFFF","1B")]:
+                            _ecnt = len(_spray_in[_spray_in["events"]==_et])
+                            if _ecnt == 0: continue
+                            _dir_h += (
+                                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+                                f'<div style="width:9px;height:9px;border-radius:50%;background:{_ec};flex-shrink:0"></div>'
+                                f'<span style="color:#8B9EC4;font-size:.74rem;width:28px">{_el}</span>'
+                                f'<span style="color:#F4F8FF;font-weight:700;font-size:.85rem">{_ecnt}</span>'
+                                f'</div>'
+                            )
+                        _dir_h += '</div>'
+                        st.markdown(_dir_h, unsafe_allow_html=True)
+
     st.stop()
 
 # ── Controls (top of page, no sidebar needed) ──────────────────────────────────
@@ -1538,9 +1913,9 @@ mlbam_ids = {p: p_mlbam(p) for p in PLAYERS}
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 if mode == "Hitters":
-    t1,t2,t3,t4,t5,t6,t7 = st.tabs(["Overview","Hitting","Defense","Statcast","Plate Discipline","Free Agent","Scouting Report"])
+    t1,t2,t3,t4,t5,t6 = st.tabs(["Overview","Hitting","Defense","Statcast","Plate Discipline","Free Agent"])
 else:
-    t1,t2,t3,t4,t5,t6,t7 = st.tabs(["Overview","Results","Arsenal","Batted Ball","Advanced","Free Agent","Scouting Report"])
+    t1,t2,t3,t4,t5,t6 = st.tabs(["Overview","Results","Arsenal","Batted Ball","Advanced","Free Agent"])
 
 # ════════════════════════════════════════════════════════════════════════════════
 # SHARED: performance index bar (used in both Overview tabs)
@@ -2753,107 +3128,7 @@ else:
     with t6:
         render_fa_tab()
 
-    # ── TAB 7: SCOUTING REPORT ─────────────────────────────────────────────────
-    with t7:
-        st.markdown('<div class="section-header">Scouting Report — 20-80 Tool Grades</div>',
-                    unsafe_allow_html=True)
-
-        def _grade_color(g):
-            if g >= 70: return "#1a7a4a"
-            if g >= 60: return "#2ecc71"
-            if g >= 55: return "#7dce82"
-            if g >= 50: return "#95a5a6"
-            if g >= 45: return "#e67e22"
-            if g >= 40: return "#e74c3c"
-            return "#922b21"
-
-        def _render_grades(player):
-            grades = _compute_scouting_grades(player)
-            if grades is None:
-                st.info(f"Not enough data to compute grades for {player}.")
-                return
-            st.markdown(f"**{player}**")
-            for tool, val in grades.items():
-                gc = _grade_color(val)
-                gl = grade_label(val)
-                st.markdown(
-                    f'<div class="grade-row">'
-                    f'<span class="grade-tool">{tool}</span>'
-                    f'<span class="grade-pill" style="background:{gc};">{val}</span>'
-                    f'<span style="color:{gc};font-weight:700;font-size:.8rem;min-width:90px;">{gl}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True)
-            ofp = round(sum(grades.values()) / len(grades))
-            gc_ofp = _grade_color(ofp)
-            st.markdown(
-                f'<div style="margin-top:10px;padding:10px;background:#1A1D2E;border-radius:8px;text-align:center;">'
-                f'<span style="color:#9BA3B8;font-size:.75rem;letter-spacing:1px;">OVERALL FUTURE POTENTIAL</span><br/>'
-                f'<span style="color:{gc_ofp};font-size:2rem;font-weight:900;">{ofp}</span>'
-                f'<span style="color:{gc_ofp};font-size:.9rem;font-weight:700;margin-left:8px;">{grade_label(ofp)}</span>'
-                f'</div>', unsafe_allow_html=True)
-
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            _render_grades(player_a)
-        with sc2:
-            _render_grades(player_b)
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Tool Grade Radar</div>', unsafe_allow_html=True)
-
-        sc_grades_t7 = {p: _compute_scouting_grades(p) for p in PLAYERS}
-        if any(g is not None for g in sc_grades_t7.values()):
-            tools_t7 = list(next(g for g in sc_grades_t7.values() if g is not None).keys())
-            radar_ind = [{"name": t, "max": 80, "min": 20} for t in tools_t7]
-            radar_series = []
-            for player in PLAYERS:
-                grade_data = sc_grades_t7.get(player)
-                if grade_data is None: continue
-                radar_series.append({
-                    "name": player, "type": "radar",
-                    "data": [{"value": [grade_data.get(t, 50) for t in tools_t7],
-                              "name": player,
-                              "lineStyle": {"color": COLORS[player], "width": 2},
-                              "areaStyle": {"color": COLORS[player], "opacity": 0.15},
-                              "itemStyle": {"color": COLORS[player]}}]
-                })
-            ech({
-                **_base("20-80 Tool Grades Comparison"),
-                "legend": {"bottom": 4, "textStyle": {"color": TEXT}, "data": PLAYERS},
-                "radar": {"indicator": radar_ind, "shape": "polygon",
-                          "splitLine": {"lineStyle": {"color": LINE_CLR}},
-                          "splitArea": {"areaStyle": {"color": [CARD_BG, "#1E2235"]}},
-                          "axisName": {"color": TEXT, "fontSize": 11}},
-                "series": radar_series,
-            }, height=380)
-
-        if mode == "Pitchers":
-            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Pitch Arsenal from Statcast</div>',
-                        unsafe_allow_html=True)
-            sc_sel = st.selectbox("Season", sorted(sel_seasons, reverse=True), key="sc_t7")
-            for player in PLAYERS:
-                mid = p_mlbam(player)
-                if not mid: continue
-                with st.spinner(f"Loading arsenal for {player}..."):
-                    raw = get_statcast_pitcher_raw(mid, sc_sel)
-                arsenal = build_arsenal(raw) if not raw.empty else pd.DataFrame()
-                if arsenal.empty:
-                    st.info(f"No Statcast data for {player} in {sc_sel}.")
-                    continue
-                st.markdown(f"**{player} — {sc_sel} Arsenal**")
-                disp_cols = [c for c in ["pitch_name","count","Velo","AvgVelo","MaxVelo",
-                                         "SwStr_pct","InZone_pct","GB_pct"] if c in arsenal.columns]
-                st.dataframe(arsenal[disp_cols].style.format(
-                    {c: "{:.1f}" for c in disp_cols if c not in ["pitch_name","count"]}
-                ), use_container_width=True, hide_index=True)
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">GM Summary & Gameplan Notes</div>',
-                    unsafe_allow_html=True)
-        for bullet in _gm_bullets():
-            clean = bullet.replace("**", "")
-            st.markdown(f"- {clean}")
+    # (Scouting Report moved to dedicated nav page)
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
