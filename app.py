@@ -1407,13 +1407,18 @@ var cv=document.getElementById('sc'),ctx=cv.getContext('2d');
 var W=cv.width,H=cv.height,SX=W/250,SY=H/260;
 function px(x){{return x*SX;}} function py(y){{return y*SY;}}
 ctx.fillStyle='{CARD_BG}';ctx.fillRect(0,0,W,H);
-ctx.beginPath();ctx.moveTo(px(-35),py(35));
-ctx.quadraticCurveTo(px(125),py(-5),px(285),py(35));
-ctx.strokeStyle='#C8102E';ctx.lineWidth=2;ctx.stroke();
+// Foul lines — extend to off-canvas poles; canvas clips automatically
+var lPX=px(-35),lPY=py(35),rPX=px(285),rPY=py(35),hmX=px(125),hmY=py(208);
 ctx.beginPath();
-ctx.moveTo(px(125),py(208));ctx.lineTo(px(-35),py(35));
-ctx.moveTo(px(125),py(208));ctx.lineTo(px(285),py(35));
+ctx.moveTo(hmX,hmY);ctx.lineTo(lPX,lPY);
+ctx.moveTo(hmX,hmY);ctx.lineTo(rPX,rPY);
 ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=1.5;ctx.stroke();
+// Outfield arc — anchored to exact canvas-edge intersections of foul lines
+var tL=(0-hmX)/(lPX-hmX), tR=(W-hmX)/(rPX-hmX);
+var arcLY=hmY+tL*(lPY-hmY), arcRY=hmY+tR*(rPY-hmY);
+ctx.beginPath();ctx.moveTo(0,arcLY);
+ctx.quadraticCurveTo(W/2,-30,W,arcRY);
+ctx.strokeStyle='#C8102E';ctx.lineWidth=2.5;ctx.stroke();
 ctx.beginPath();ctx.arc(px(125),py(152),px(46),0,Math.PI*2);
 ctx.strokeStyle='#C8A06033';ctx.lineWidth=1;ctx.stroke();
 var hm=[px(125),py(208)],b1=[px(172),py(161)],b2=[px(125),py(112)],b3=[px(78),py(161)];
