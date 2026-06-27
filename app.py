@@ -1052,72 +1052,134 @@ if app_mode == "Scouting Report":
         color, c1, c2 = _gc(val)
         lbl = grade_label(val)
         return (
-            f'<div style="display:flex;align-items:center;gap:12px;padding:9px 0;'
+            f'<div style="display:flex;align-items:center;gap:12px;padding:10px 0;'
             f'border-bottom:1px solid #1A2E47">'
-            f'<span style="width:100px;color:#8B9EC4;font-size:.72rem;font-weight:700;'
+            f'<span style="width:115px;color:#8B9EC4;font-size:.7rem;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.8px;flex-shrink:0">{tool}</span>'
-            f'<div style="flex:1;height:10px;background:#0A1525;border-radius:5px;overflow:hidden">'
-            f'<div style="width:{pct}%;height:100%;border-radius:5px;'
+            f'<div style="width:36px;height:36px;border-radius:7px;background:{color}18;'
+            f'border:2px solid {color}88;display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+            f'<span style="color:{color};font-weight:900;font-size:1.05rem;font-family:monospace">{val}</span></div>'
+            f'<div style="flex:1;height:8px;background:#0A1525;border-radius:4px;overflow:hidden">'
+            f'<div style="width:{pct}%;height:100%;border-radius:4px;'
             f'background:linear-gradient(90deg,{c1},{c2})"></div></div>'
-            f'<span style="width:32px;text-align:center;color:{color};font-weight:900;'
-            f'font-size:1.15rem;font-family:monospace;flex-shrink:0">{val}</span>'
-            f'<span style="width:110px;color:{color};font-size:.72rem;font-weight:700;'
-            f'text-transform:uppercase;letter-spacing:.6px;flex-shrink:0">{lbl}</span>'
+            f'<span style="width:120px;color:{color};font-size:.68rem;font-weight:700;'
+            f'text-transform:uppercase;letter-spacing:.6px;text-align:right;flex-shrink:0">{lbl}</span>'
             f'</div>'
         )
 
-    def _scout_card(player, player_color):
-        grades = _compute_scouting_grades(player)
-        mid = p_mlbam(player)
-        hs = (f"https://img.mlbstatic.com/mlb-photos/image/upload/"
-              f"d_people:generic:headshot:67:current.png"
-              f"/w_213,q_auto:best/v1/people/{mid}/headshot/67/current") if mid else ""
-        row = p_latest(player)
-        team = row.get("Team","") if row is not None else ""
+    def _ofp_role(g):
+        if g>=70: return "Franchise Cornerstone"
+        if g>=65: return "No. 1 Starter / All-Star"
+        if g>=60: return "No. 2 Starter / Above Avg Regular"
+        if g>=55: return "No. 3 Starter / Solid Regular"
+        if g>=50: return "No. 4 Starter / Platoon Player"
+        if g>=45: return "No. 5 / Fringe Regular"
+        if g>=40: return "Reliever / Bench Piece"
+        return "AAAA / Org Depth"
 
-        # Header
-        st.markdown(
-            f'<div style="background:{CARD_BG};border:1px solid {LINE_CLR};border-top:4px solid {player_color};'
-            f'border-radius:12px;padding:20px;margin-bottom:16px">'
-            f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">'
-            + (f'<img src="{hs}" style="width:72px;height:72px;border-radius:50%;'
-               f'border:3px solid {player_color};object-fit:cover;flex-shrink:0">' if hs else
-               f'<div style="width:72px;height:72px;border-radius:50%;background:#1A2E47;'
-               f'border:3px solid {player_color};flex-shrink:0"></div>')
-            + f'<div><div style="font-size:1.3rem;font-weight:900;color:#F4F8FF;letter-spacing:.5px">{player}</div>'
-            f'<div style="font-size:.82rem;color:{SUBTEXT};margin-top:2px">{team}</div></div>'
-            f'</div>',
-            unsafe_allow_html=True)
+    def _stat_table_html(rows, headers):
+        th = "".join(
+            f'<th style="padding:9px 14px;text-align:center;font-size:.68rem;'
+            f'letter-spacing:.9px;color:#F4F8FF;font-weight:700;text-transform:uppercase;'
+            f'white-space:nowrap">{h}</th>'
+            for h in headers
+        )
+        body = ""
+        for i, row_vals in enumerate(rows):
+            bg = "#0F1E32" if i % 2 == 0 else "#0A1525"
+            cells = "".join(
+                f'<td style="padding:8px 14px;text-align:center;font-size:.82rem;'
+                f'color:#F4F8FF;border-bottom:1px solid #1A2E47;white-space:nowrap">{v}</td>'
+                for v in row_vals
+            )
+            body += f'<tr style="background:{bg}">{cells}</tr>'
+        return (
+            f'<div style="overflow-x:auto;border-radius:10px;border:1px solid #1A2E47;margin-bottom:20px">'
+            f'<table style="width:100%;border-collapse:collapse">'
+            f'<thead><tr style="background:#C8102E">{th}</tr></thead>'
+            f'<tbody>{body}</tbody>'
+            f'</table></div>'
+        )
 
-        if grades is None:
-            st.markdown('<div style="color:#8B9EC4;font-size:.85rem;padding:8px 0">Insufficient data to grade this player.</div></div>', unsafe_allow_html=True)
-            return
+    def _gameplan_bullets(player, grades, latest_row):
+        bullets = []
+        def gf(col, default):
+            v = latest_row.get(col)
+            try: return float(v) if v is not None and pd.notna(v) else default
+            except: return default
 
-        bars = "".join(_grade_bar(t, v) for t, v in grades.items())
-        ofp = round(sum(grades.values()) / len(grades))
-        oc, _, oc2 = _gc(ofp)
-        ol = grade_label(ofp)
-
-        st.markdown(
-            f'<div style="margin-bottom:12px">{bars}</div>'
-            f'<div style="margin-top:16px;padding:14px 20px;background:#0A1525;border-radius:10px;'
-            f'border:1px solid {player_color}33;display:flex;align-items:center;justify-content:space-between">'
-            f'<div><div style="color:{SUBTEXT};font-size:.68rem;text-transform:uppercase;'
-            f'letter-spacing:1.5px;margin-bottom:2px">Overall Future Potential</div>'
-            f'<div style="color:{SUBTEXT};font-size:.72rem">20-80 Scouting Scale</div></div>'
-            f'<div style="text-align:right">'
-            f'<span style="color:{oc};font-size:2.6rem;font-weight:900;font-family:monospace;'
-            f'line-height:1">{ofp}</span>'
-            f'<div style="color:{oc};font-size:.78rem;font-weight:700;text-transform:uppercase;'
-            f'letter-spacing:1px">{ol}</div></div></div>'
-            f'</div>',
-            unsafe_allow_html=True)
+        if mode == "Pitchers":
+            velo_g = grades.get("FB Velo", 50)
+            cmd_g  = grades.get("Command", 50)
+            dec_g  = grades.get("Deception", 50)
+            stam_g = grades.get("Stamina", 50)
+            approx_velo = round(93.5 + (velo_g - 50) / 5.0, 1)
+            bb_pct = gf("BB%", 8.5)
+            k_pct  = gf("K%", 23.0)
+            era    = gf("ERA", 4.00)
+            if velo_g >= 60:
+                bullets.append(f"Elite fastball (~{approx_velo} mph) — don't sit dead-red. Expect FB hard in on the hands. Look for off-speed in two-strike counts.")
+            elif velo_g >= 55:
+                bullets.append(f"Above-average heater (~{approx_velo} mph) — be ready early in the count. Don't be late on the fastball.")
+            else:
+                bullets.append(f"Below-average velocity (~{approx_velo} mph) — attack the fastball aggressively in hitter's counts. Don't let him work soft stuff deep into at-bats.")
+            if cmd_g >= 60:
+                bullets.append(f"Elite command ({bb_pct:.1f}% BB rate) — he paints the corners all game. Expand the zone early; don't let strikes go to waste.")
+            elif cmd_g >= 50:
+                bullets.append(f"Average command ({bb_pct:.1f}% BB rate) — work counts; he will nibble when behind and may miss over the plate in favorable counts.")
+            else:
+                bullets.append(f"Below-average command ({bb_pct:.1f}% BB rate) — take pitches and work walks. Force him into the zone; don't chase early.")
+            if dec_g >= 60:
+                bullets.append(f"High strikeout stuff ({k_pct:.1f}% K rate) — shorten up with two strikes and protect the plate.")
+            elif dec_g <= 44:
+                bullets.append(f"Below-average strikeout rate ({k_pct:.1f}% K rate) — put the ball in play. Don't give up at-bats; he lives off contact outs.")
+            else:
+                bullets.append(f"Average swing-and-miss ({k_pct:.1f}% K rate) — be selective but don't over-protect with two strikes.")
+            if stam_g <= 44:
+                bullets.append("Pitch-count sensitive — grind deep into at-bats early. Get to the bullpen by the 5th.")
+            elif stam_g >= 60:
+                bullets.append("Workhorse starter — expect 6–7 IP. No quick hook; bring your best AB every time through the lineup.")
+            if era <= 3.25:
+                bullets.append(f"Elite ERA ({era:.2f}) — situational hitting is critical. Drive in runners; don't swing for the fences.")
+            elif era >= 5.00:
+                bullets.append(f"High ERA ({era:.2f}) — capitalize on baserunners. He gives up big innings; stay patient and the runs will come.")
+        else:
+            hit_g   = grades.get("Hit", 50)
+            pow_g   = grades.get("Power", 50)
+            spd_g   = grades.get("Speed", 50)
+            avg_v   = gf("AVG", .248)
+            slg_v   = gf("SLG", .400)
+            sb_v    = gf("SB", 0)
+            wrc     = gf("wRC+", 100)
+            if pow_g >= 60:
+                bullets.append(f"Plus-power hitter (.{int(slg_v*1000):03d} SLG) — do not miss over the plate. Work him away and down. Never leave a breaking ball hanging.")
+            elif pow_g <= 44:
+                bullets.append(f"Below-average power (.{int(slg_v*1000):03d} SLG) — challenge him with hard stuff up. He beats you with contact, not the long ball.")
+            else:
+                bullets.append(f"Average raw power (.{int(slg_v*1000):03d} SLG) — respect gap power. Don't pattern him fastball-only and don't miss in the zone.")
+            if hit_g >= 60:
+                bullets.append(f"Plus contact ability (.{int(avg_v*1000):03d} AVG) — throw your best stuff for strikes. Don't nibble; he'll make you pay for walks.")
+            elif hit_g <= 44:
+                bullets.append(f"Below-average bat (.{int(avg_v*1000):03d} AVG) — expand the chase zone down and away. He'll fish for breaking balls out of the zone.")
+            else:
+                bullets.append(f"Average hitter (.{int(avg_v*1000):03d} AVG) — mix locations and change eye levels. Don't be predictable.")
+            if spd_g >= 60:
+                bullets.append(f"Premium stolen base threat ({int(sb_v):.0f} SB) — keep him close at all times. Vary slide step and pickoff timing.")
+            elif spd_g >= 50:
+                bullets.append(f"Above-average runner ({int(sb_v):.0f} SB) — be mindful with men on. Control the running game.")
+            else:
+                bullets.append("Below-average speed — no running game threat. Focus entirely on pitch execution.")
+            if wrc >= 130:
+                bullets.append(f"Elite wRC+ ({int(wrc)}) — treat every at-bat as high-leverage. No free passes; make him earn it.")
+            elif wrc <= 80:
+                bullets.append(f"Below-average production (wRC+ {int(wrc)}) — attack early in the count. Don't give him a free look.")
+        return bullets
 
     # ── Controls ────────────────────────────────────────────────────────────────
-    _c1, _c2 = st.columns([1, 3])
-    with _c1:
+    _sr_c1, _sr_c2 = st.columns([1, 3])
+    with _sr_c1:
         mode = st.radio("Type", ["Hitters","Pitchers"], horizontal=True, key="sr_mode")
-    with _c2:
+    with _sr_c2:
         _sr_seas = st.pills("Seasons", ALL_SEASONS, default=ALL_SEASONS, selection_mode="multi", key="sr_seasons")
         sel_seasons = tuple(sorted(_sr_seas)) if _sr_seas else (2026,)
 
@@ -1132,48 +1194,240 @@ if app_mode == "Scouting Report":
         except Exception: pass
 
     _plist = sorted(all_fg["Name"].dropna().unique().tolist()) if not all_fg.empty else []
-    _pc1, _pc2 = st.columns(2)
-    with _pc1: sr_pa = st.selectbox("Player A", _plist, key="sr_pa")
-    with _pc2: sr_pb = st.selectbox("Player B", [p for p in _plist if p != sr_pa], key="sr_pb")
+    _def_sr = next((p for p in _plist if "Ohtani" in p), _plist[0] if _plist else "")
+    sr_player = st.selectbox(
+        "Select Player", _plist,
+        index=_plist.index(_def_sr) if _def_sr in _plist else 0,
+        key="sr_player"
+    )
+    if not sr_player:
+        st.warning("No players found. Try adjusting the seasons.")
+        st.stop()
 
-    SR_PLAYERS = [sr_pa, sr_pb]
-    SR_COLORS  = {sr_pa: PA_COL, sr_pb: PB_COL}
+    # ── Load player data ─────────────────────────────────────────────────────────
+    row    = p_latest(sr_player)
+    mid    = p_mlbam(sr_player)
+    team   = row.get("Team", "") if row is not None else ""
+    hs_url = (
+        f"https://img.mlbstatic.com/mlb-photos/image/upload/"
+        f"d_people:generic:headshot:67:current.png"
+        f"/w_213,q_auto:best/v1/people/{mid}/headshot/67/current"
+    ) if mid else ""
+    grades = _compute_scouting_grades(sr_player)
+    ofp    = round(sum(grades.values()) / len(grades)) if grades else 50
+    ofp_c, _, _ = _gc(ofp)
+    sn_df  = p_seasons(sr_player)
+    _seas_str = " / ".join(str(s) for s in sorted(sel_seasons))
 
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    # ── Report header banner ──────────────────────────────────────────────────────
+    def _qs(key, fmt):
+        v = row.get(key) if row is not None else None
+        return safe(v, fmt)
+
+    if mode == "Pitchers":
+        _qs_items = [
+            ("ERA",  _qs("ERA",  "{:.2f}"), "#F4F8FF"),
+            ("WHIP", _qs("WHIP", "{:.2f}"), "#F4F8FF"),
+            ("K%",   _qs("K%",   "{:.1f}") + "%", "#00BFFF"),
+            ("FIP",  _qs("FIP",  "{:.2f}"), "#C4A962"),
+        ]
+    else:
+        _qs_items = [
+            ("AVG",  _qs("AVG",  "{:.3f}"), "#F4F8FF"),
+            ("OPS",  _qs("OPS",  "{:.3f}"), "#F4F8FF"),
+            ("wRC+", _qs("wRC+", "{:.0f}"), "#00BFFF"),
+            ("HR",   _qs("HR",   "{:.0f}"), "#C4A962"),
+        ]
+
+    _qs_html = "".join(
+        f'<div style="text-align:center;background:#0A1525;border-radius:10px;'
+        f'padding:12px 18px;border:1px solid #1A2E47;min-width:72px">'
+        f'<div style="font-size:1.45rem;font-weight:900;color:{vc};font-family:monospace;line-height:1">{vv}</div>'
+        f'<div style="font-size:.62rem;color:#8B9EC4;text-transform:uppercase;letter-spacing:.9px;margin-top:3px">{vk}</div>'
+        f'</div>'
+        for vk, vv, vc in _qs_items
+    )
+
+    _img_tag = (
+        f'<img src="{hs_url}" style="width:88px;height:88px;border-radius:50%;'
+        f'border:3px solid #C8102E;object-fit:cover;flex-shrink:0;'
+        f'box-shadow:0 0 18px #C8102E44" onerror="this.style.display=\'none\'">'
+    ) if hs_url else (
+        f'<div style="width:88px;height:88px;border-radius:50%;background:#1A2E47;'
+        f'border:3px solid #C8102E;flex-shrink:0"></div>'
+    )
+
     st.markdown(
-        f'<div style="text-align:center;margin-bottom:20px">'
-        f'<div style="font-size:1.6rem;font-weight:900;color:#F4F8FF;letter-spacing:2px;text-transform:uppercase">Scouting Report</div>'
-        f'<div style="font-size:.85rem;color:{SUBTEXT};margin-top:4px">'
-        f'{sr_pa} vs. {sr_pb} &nbsp;·&nbsp; {mode} &nbsp;·&nbsp; '
-        f'{", ".join(str(s) for s in sorted(sel_seasons))}</div>'
-        f'</div>',
-        unsafe_allow_html=True)
+        f'<div style="background:linear-gradient(135deg,#0F1E32 55%,#121F35);'
+        f'border-top:4px solid #C8102E;border:1px solid #1A2E47;border-top-width:4px;'
+        f'border-radius:14px;padding:24px 28px;margin:10px 0 22px">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;'
+        f'flex-wrap:wrap;gap:18px">'
+        f'<div style="display:flex;align-items:center;gap:20px">'
+        f'{_img_tag}'
+        f'<div>'
+        f'<div style="font-size:.62rem;font-weight:700;color:#C8102E;letter-spacing:2.5px;'
+        f'text-transform:uppercase;margin-bottom:5px">⚾ Advance Scouting Report</div>'
+        f'<div style="font-size:1.75rem;font-weight:900;color:#F4F8FF;line-height:1.1;'
+        f'letter-spacing:.3px">{sr_player}</div>'
+        f'<div style="font-size:.85rem;color:#8B9EC4;margin-top:5px">'
+        f'{team}&nbsp;&nbsp;·&nbsp;&nbsp;{"Pitcher" if mode=="Pitchers" else "Hitter"}'
+        f'&nbsp;&nbsp;·&nbsp;&nbsp;{_seas_str}</div>'
+        f'</div></div>'
+        f'<div style="display:flex;gap:12px;flex-wrap:wrap">{_qs_html}</div>'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
 
-    sc1, sc2 = st.columns(2)
-    with sc1: _scout_card(sr_pa, PA_COL)
-    with sc2: _scout_card(sr_pb, PB_COL)
+    # ── Tool Grades + OFP ────────────────────────────────────────────────────────
+    if grades:
+        _tg_col, _ofp_col = st.columns([5, 2])
+        with _tg_col:
+            st.markdown(
+                f'<div style="font-size:.62rem;font-weight:700;color:#C8102E;'
+                f'letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px">'
+                f'Tool Grades · 20-80 Scouting Scale</div>',
+                unsafe_allow_html=True
+            )
+            _bars_html = "".join(_grade_bar(t, v) for t, v in grades.items())
+            st.markdown(
+                f'<div style="background:#0F1E32;border-radius:12px;padding:16px 22px;'
+                f'border:1px solid #1A2E47">{_bars_html}</div>',
+                unsafe_allow_html=True
+            )
+        with _ofp_col:
+            _role_str = _ofp_role(ofp)
+            st.markdown(
+                f'<div style="background:#0F1E32;border-radius:12px;padding:28px 20px;'
+                f'border:1px solid #1A2E47;display:flex;flex-direction:column;'
+                f'align-items:center;text-align:center;height:100%;box-sizing:border-box">'
+                f'<div style="font-size:.62rem;font-weight:700;color:#C8102E;'
+                f'letter-spacing:2.5px;text-transform:uppercase;margin-bottom:14px">OFP</div>'
+                f'<div style="font-size:5rem;font-weight:900;font-family:monospace;'
+                f'color:{ofp_c};line-height:1">{ofp}</div>'
+                f'<div style="font-size:.75rem;font-weight:700;color:{ofp_c};'
+                f'text-transform:uppercase;letter-spacing:1px;margin-top:8px">'
+                f'{grade_label(ofp)}</div>'
+                f'<div style="margin-top:14px;padding-top:14px;border-top:1px solid #1A2E47;'
+                f'width:100%">'
+                f'<div style="font-size:.72rem;color:#8B9EC4;line-height:1.5">{_role_str}</div>'
+                f'</div></div>',
+                unsafe_allow_html=True
+            )
 
-    # Radar
-    st.markdown('<div class="section-header">Tool Grade Radar</div>', unsafe_allow_html=True)
-    _sr_grades = {p: _compute_scouting_grades(p) for p in SR_PLAYERS}
-    if any(g is not None for g in _sr_grades.values()):
-        _tools = list(next(g for g in _sr_grades.values() if g is not None).keys())
-        ech({
-            **_base(""),
-            "legend": {"bottom":4,"textStyle":{"color":TEXT},"data":SR_PLAYERS},
-            "radar":  {"indicator":[{"name":t,"max":80,"min":20} for t in _tools],
-                       "shape":"polygon",
-                       "splitLine":{"lineStyle":{"color":LINE_CLR}},
-                       "splitArea":{"areaStyle":{"color":[CARD_BG,"#0A1A2E"]}},
-                       "axisName": {"color":TEXT,"fontSize":11}},
-            "series": [{"name":_p,"type":"radar",
-                        "data":[{"value":[(_sr_grades[_p] or {}).get(t,50) for t in _tools],
-                                 "name":_p,
-                                 "lineStyle":{"color":SR_COLORS[_p],"width":2},
-                                 "areaStyle":{"color":SR_COLORS[_p],"opacity":0.18},
-                                 "itemStyle":{"color":SR_COLORS[_p]}}]}
-                       for _p in SR_PLAYERS if _sr_grades.get(_p)],
-        }, height=440)
+    # ── Pitch Arsenal (Pitchers only) ────────────────────────────────────────────
+    if mode == "Pitchers" and mid and HAS_PB:
+        _sc_raw = pd.DataFrame()
+        for _s in sorted(sel_seasons, reverse=True):
+            _tmp = get_statcast_pitcher_raw(mid, _s)
+            if not _tmp.empty:
+                _sc_raw = _tmp
+                break
+        if not _sc_raw.empty:
+            _arsenal = build_arsenal(_sc_raw)
+            if not _arsenal.empty:
+                st.markdown(
+                    '<div class="section-header">Pitch Arsenal</div>',
+                    unsafe_allow_html=True
+                )
+                _arc1, _arc2 = st.columns([1, 2])
+                with _arc1:
+                    _pie_colors = ["#C8102E","#00BFFF","#C4A962","#2ecc71","#8B9EC4","#FFA726","#EF5350"]
+                    _pie_data   = [
+                        {"value": float(r["Usage%"]), "name": r["Pitch"]}
+                        for _, r in _arsenal.iterrows()
+                    ]
+                    ech({
+                        **_base("Pitch Usage"),
+                        "legend": {"bottom": 0, "textStyle": {"color": TEXT, "fontSize": 10}},
+                        "series": [{
+                            "name": "Usage",
+                            "type": "pie",
+                            "radius": ["44%", "72%"],
+                            "center": ["50%", "44%"],
+                            "data": _pie_data,
+                            "label": {
+                                "show": True, "color": TEXT, "fontSize": 10,
+                                "formatter": "{b}\n{d}%",
+                            },
+                            "itemStyle": {"borderColor": CARD_BG, "borderWidth": 2},
+                            "color": _pie_colors,
+                        }],
+                    }, height=310)
+                with _arc2:
+                    _a_heads = ["Pitch", "Usage %", "Velo", "Spin", "xwOBA", "EV"]
+                    _a_rows  = []
+                    for _, _ar in _arsenal.iterrows():
+                        _a_rows.append([
+                            _ar.get("Pitch", ""),
+                            f'{_ar.get("Usage%", 0):.1f}%',
+                            f'{_ar.get("Velo", 0):.1f}',
+                            f'{int(_ar.get("Spin", 0)):,}',
+                            f'{_ar.get("xwOBA", 0):.3f}',
+                            f'{_ar.get("EV", 0):.1f}',
+                        ])
+                    st.markdown(_stat_table_html(_a_rows, _a_heads), unsafe_allow_html=True)
+
+    # ── Season Stats Table ───────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">Season Stats</div>', unsafe_allow_html=True)
+    if not sn_df.empty:
+        if mode == "Hitters":
+            _sh = ["Season","Team","G","PA","AVG","OBP","SLG","OPS","HR","RBI","SB","wRC+","WAR"]
+            _sr_rows = []
+            for _, _rr in sn_df.sort_values("Season", ascending=False).iterrows():
+                _sr_rows.append([
+                    int(_rr.get("Season", 0)),
+                    _rr.get("Team", ""),
+                    safe(_rr.get("G"),    "{:.0f}"),
+                    safe(_rr.get("PA"),   "{:.0f}"),
+                    safe(_rr.get("AVG"),  "{:.3f}"),
+                    safe(_rr.get("OBP"),  "{:.3f}"),
+                    safe(_rr.get("SLG"),  "{:.3f}"),
+                    safe(_rr.get("OPS"),  "{:.3f}"),
+                    safe(_rr.get("HR"),   "{:.0f}"),
+                    safe(_rr.get("RBI"),  "{:.0f}"),
+                    safe(_rr.get("SB"),   "{:.0f}"),
+                    safe(_rr.get("wRC+"), "{:.0f}"),
+                    safe(_rr.get("WAR"),  "{:.1f}"),
+                ])
+        else:
+            _sh = ["Season","Team","G","GS","IP","ERA","WHIP","K%","BB%","K/9","FIP","WAR"]
+            _sr_rows = []
+            for _, _rr in sn_df.sort_values("Season", ascending=False).iterrows():
+                _sr_rows.append([
+                    int(_rr.get("Season", 0)),
+                    _rr.get("Team", ""),
+                    safe(_rr.get("G"),    "{:.0f}"),
+                    safe(_rr.get("GS"),   "{:.0f}"),
+                    safe(_rr.get("IP"),   "{:.1f}"),
+                    safe(_rr.get("ERA"),  "{:.2f}"),
+                    safe(_rr.get("WHIP"), "{:.2f}"),
+                    safe(_rr.get("K%"),   "{:.1f}") + "%",
+                    safe(_rr.get("BB%"),  "{:.1f}") + "%",
+                    safe(_rr.get("K/9"),  "{:.1f}"),
+                    safe(_rr.get("FIP"),  "{:.2f}"),
+                    safe(_rr.get("WAR"),  "{:.1f}"),
+                ])
+        st.markdown(_stat_table_html(_sr_rows, _sh), unsafe_allow_html=True)
+
+    # ── Gameplan ─────────────────────────────────────────────────────────────────
+    if grades and row is not None:
+        _gp_label = "Hitter's Gameplan" if mode == "Pitchers" else "Pitcher's Gameplan"
+        st.markdown(f'<div class="section-header">{_gp_label}</div>', unsafe_allow_html=True)
+        _bullets = _gameplan_bullets(sr_player, grades, row)
+        _bullets_html = "".join(
+            f'<div style="display:flex;align-items:flex-start;gap:14px;padding:13px 18px;'
+            f'background:#0F1E32;border-radius:9px;border-left:3px solid #C8102E;'
+            f'margin-bottom:8px;border:1px solid #1A2E47;border-left-width:3px">'
+            f'<div style="width:24px;height:24px;background:#C8102E;border-radius:50%;'
+            f'display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">'
+            f'<span style="color:#fff;font-size:.72rem;font-weight:900">{i+1}</span></div>'
+            f'<div style="color:#F4F8FF;font-size:.84rem;line-height:1.6">{b}</div>'
+            f'</div>'
+            for i, b in enumerate(_bullets)
+        )
+        st.markdown(_bullets_html, unsafe_allow_html=True)
+
     st.stop()
 
 # ── Controls (top of page, no sidebar needed) ──────────────────────────────────
