@@ -1394,7 +1394,7 @@ if app_mode == "Scouting Report":
 .leg{{display:flex;gap:14px;justify-content:center;padding:5px 0;font-size:11px;color:#8B9EC4;flex-wrap:wrap}}
 .dot{{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}}
 </style></head><body>
-<canvas id="sc" width="380" height="360"></canvas>
+<canvas id="sc" width="500" height="440"></canvas>
 <div class="leg">
   <span><span class="dot" style="background:#00BFFF"></span>1B ({_sp_n1})</span>
   <span><span class="dot" style="background:#FFA726"></span>2B ({_sp_n2})</span>
@@ -1404,7 +1404,7 @@ if app_mode == "Scouting Report":
 </div>
 <script>
 var cv=document.getElementById('sc'),ctx=cv.getContext('2d');
-var W=cv.width,H=cv.height,SX=W/250,SY=H/260;
+var W=cv.width,H=cv.height,SX=W/250,SY=H/280;
 function px(x){{return x*SX;}} function py(y){{return y*SY;}}
 ctx.fillStyle='{CARD_BG}';ctx.fillRect(0,0,W,H);
 // Foul lines — extend to off-canvas poles; canvas clips automatically
@@ -1417,7 +1417,7 @@ ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=1.5;ctx.stroke();
 var tL=(0-hmX)/(lPX-hmX), tR=(W-hmX)/(rPX-hmX);
 var arcLY=hmY+tL*(lPY-hmY), arcRY=hmY+tR*(rPY-hmY);
 ctx.beginPath();ctx.moveTo(0,arcLY);
-ctx.quadraticCurveTo(W/2,-30,W,arcRY);
+ctx.quadraticCurveTo(W/2,-220,W,arcRY);
 ctx.strokeStyle='#C8102E';ctx.lineWidth=2.5;ctx.stroke();
 ctx.beginPath();ctx.arc(px(125),py(152),px(46),0,Math.PI*2);
 ctx.strokeStyle='#C8A06033';ctx.lineWidth=1;ctx.stroke();
@@ -1439,7 +1439,7 @@ hits.forEach(function(h){{
 </script></body></html>"""
             _spc1, _spc2 = st.columns([2, 1])
             with _spc1:
-                components.html(_sp_html, height=420)
+                components.html(_sp_html, height=510)
             with _spc2:
                 _lf2 = _sp_in[_sp_in["hc_x"] < 100]
                 _cf2 = _sp_in[(_sp_in["hc_x"] >= 100) & (_sp_in["hc_x"] <= 150)]
