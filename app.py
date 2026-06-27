@@ -1112,13 +1112,12 @@ if app_mode == "Scouting Report":
 
 # ── Controls (top of page, no sidebar needed) ──────────────────────────────────
 st.markdown('<div class="section-header">Select Players</div>', unsafe_allow_html=True)
-ctrl1, ctrl2, ctrl3 = st.columns([1, 1, 2])
+ctrl1, _ = st.columns([1, 3])
 with ctrl1:
     mode = st.radio("Compare", ["Hitters","Pitchers"], horizontal=True)
-with ctrl2:
-    sel_seasons = st.multiselect("Seasons", ALL_SEASONS, default=[2024,2025,2026])
-    if not sel_seasons:
-        sel_seasons = [2025]
+sel_seasons = st.multiselect("Seasons", ALL_SEASONS, default=[2024,2025,2026])
+if not sel_seasons:
+    sel_seasons = [2025]
 seasons_key = tuple(sorted(sel_seasons))
 
 all_fg = pd.DataFrame()
