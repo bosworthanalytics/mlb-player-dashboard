@@ -241,11 +241,14 @@ st.markdown("""<style>
 [data-testid="stRadio"]:has(input[value="Player Comparison"]) label > div:first-child {
   display:none !important}
 
-/* ── Multiselect season tags — fix truncation & color ── */
+/* ── Multiselect season tags ── */
+/* Push the value container away from the left border so the first tag isn't clipped */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div:first-child {
+  padding-left:10px !important;overflow:visible !important}
 [data-baseweb="tag"]{background:#1A2E47 !important;border:1px solid #00BFFF !important;
-                     border-radius:6px !important;min-width:72px !important;
-                     padding:2px 8px !important;overflow:visible !important}
-[data-baseweb="tag"] span{color:#F4F8FF !important;font-weight:600;overflow:visible !important}
+                     border-radius:6px !important;margin:2px 3px !important;
+                     padding:2px 8px 2px 8px !important}
+[data-baseweb="tag"] span{color:#F4F8FF !important;font-weight:600}
 [data-baseweb="tag"] button svg{fill:#8B9EC4 !important}
 [data-baseweb="select"] > div{background:#0F1E32 !important;border-color:#1A2E47 !important}
 
