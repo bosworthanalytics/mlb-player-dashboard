@@ -1002,7 +1002,7 @@ if app_mode == "Scouting Report":
     with _src1:
         mode = st.radio("Type", ["Hitters", "Pitchers"], horizontal=True, key="sr_mode")
     with _src2:
-        _sr_seas = st.multiselect("Seasons", ALL_SEASONS, default=[2025, 2026], key="sr_seasons")
+        _sr_seas = st.pills("Seasons", ALL_SEASONS, default=[2025, 2026], selection_mode="multi", key="sr_seasons")
         sel_seasons = tuple(sorted(_sr_seas)) if _sr_seas else (2026,)
 
     with st.spinner("Loading players..."):
@@ -1107,7 +1107,7 @@ st.markdown('<div class="section-header">Select Players</div>', unsafe_allow_htm
 ctrl1, _ = st.columns([1, 3])
 with ctrl1:
     mode = st.radio("Compare", ["Hitters","Pitchers"], horizontal=True)
-sel_seasons = st.multiselect("Seasons", ALL_SEASONS, default=[2024,2025,2026])
+sel_seasons = st.pills("Seasons", ALL_SEASONS, default=[2024, 2025, 2026], selection_mode="multi")
 if not sel_seasons:
     sel_seasons = [2025]
 seasons_key = tuple(sorted(sel_seasons))
