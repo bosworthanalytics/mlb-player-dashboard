@@ -36,7 +36,7 @@ st.set_page_config(
     page_title="MLB Player Comparison | Analytics",
     page_icon="baseball",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -217,30 +217,44 @@ st.markdown("""<style>
 .nav-title .red{color:#C8102E}
 .nav-title .blue{color:#5B9BD5}
 
-/* Streamlit tab styling — active tab uses electric blue */
-[data-baseweb="tab-list"]{background:#0F1E32 !important;border-radius:8px;padding:4px;
+/* ── Content tab bar — active tab electric blue ── */
+[data-baseweb="tab-list"]{background:#0F1E32 !important;border-radius:8px 8px 0 0;padding:4px 4px 0;
                            border-bottom:2px solid #1A2E47 !important}
-[data-baseweb="tab"]{color:#8B9EC4 !important;font-weight:600 !important;font-size:.82rem !important}
+[data-baseweb="tab"]{color:#8B9EC4 !important;font-weight:600 !important;font-size:.82rem !important;
+                     padding:8px 16px !important}
 [aria-selected="true"]{color:#00BFFF !important;border-bottom:2px solid #00BFFF !important}
 
-/* Sidebar nav styling */
-[data-testid="stSidebar"]{background-color:#0A1525 !important;border-right:1px solid #1A2E47;min-width:220px}
-[data-testid="stSidebar"] .sidebar-brand{color:#F4F8FF;font-size:1.05rem;font-weight:900;
-  letter-spacing:2px;text-transform:uppercase;padding:6px 0 14px;line-height:1.3}
-[data-testid="stSidebar"] .sidebar-brand .red{color:#C8102E}
-[data-testid="stSidebar"] .sidebar-brand .blue{color:#00BFFF}
-[data-testid="stSidebar"] .sidebar-divider{border-top:1px solid #1A2E47;margin:8px 0 14px}
-/* Radio nav items */
-[data-testid="stSidebar"] [data-testid="stRadio"] > div{gap:4px}
-[data-testid="stSidebar"] [data-testid="stRadio"] label{
-  padding:10px 14px;border-radius:8px;color:#8B9EC4;
-  font-weight:600;font-size:.88rem;transition:background .15s,color .15s;
-  border:1px solid transparent}
-[data-testid="stSidebar"] [data-testid="stRadio"] label:hover{
-  background:#1A2E47;color:#F4F8FF;border-color:#1A2E47}
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
-[data-testid="stSidebar"] [data-testid="stRadio"] input:checked ~ div{
-  background:#0F2540;color:#00BFFF !important;border-color:#00BFFF}
+/* ── Top navigation radio → styled as button tabs ── */
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) > div,
+[data-testid="stRadio"]:has(input[value="Team Comparison"]) > div,
+[data-testid="stRadio"]:has(input[value="AI Chat"]) > div {
+  display:flex;gap:6px;background:#0F1E32;padding:5px;
+  border-radius:10px;border:1px solid #1A2E47;margin-bottom:14px}
+/* All nav radio labels */
+div[data-testid="stRadio"] > div > label {
+  flex:1;text-align:center;padding:9px 18px;border-radius:8px;
+  font-weight:700;font-size:.85rem;color:#8B9EC4;cursor:pointer;
+  transition:background .15s,color .15s;border:1px solid transparent}
+div[data-testid="stRadio"] > div > label:hover{
+  background:#1A2E47;color:#F4F8FF}
+div[data-testid="stRadio"] > div > label:has(input:checked){
+  background:#C8102E;color:#fff !important;border-color:#C8102E}
+/* Hide the actual radio circle dots */
+div[data-testid="stRadio"] > div > label > div:first-child{display:none !important}
+
+/* ── Multiselect tags (season selector) ── */
+[data-baseweb="tag"]{background:#1A2E47 !important;border:1px solid #00BFFF !important;
+                     border-radius:6px !important}
+[data-baseweb="tag"] span{color:#F4F8FF !important;font-weight:600}
+[data-baseweb="tag"] button svg{fill:#8B9EC4 !important}
+[data-baseweb="select"]{background:#0F1E32 !important}
+[data-baseweb="select"] > div{background:#0F1E32 !important;border-color:#1A2E47 !important}
+[data-baseweb="input"]{background:#0F1E32 !important}
+
+/* ── Sidebar (keep hidden) ── */
+[data-testid="stSidebar"]{display:none}
+[data-testid="collapsedControl"]{display:none !important}
+[data-testid="stSidebarCollapseButton"]{display:none !important}
 
 /* Streamlit metric overrides */
 [data-testid="stMetric"]{background:#0F1E32;border-radius:10px;padding:12px 16px;
@@ -754,35 +768,23 @@ def build_arsenal(sc):
     return agg.sort_values("Usage%", ascending=False)
 
 # ── App Navigation ─────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown(
-        '<div class="sidebar-brand">⚾ <span class="red">BOSWORTH</span><br>'
-        '<span class="blue">ANALYTICS</span></div>'
-        '<div class="sidebar-divider"></div>',
-        unsafe_allow_html=True,
-    )
-    _NAV_ICONS = {"Player Comparison": "⚾", "Team Comparison": "📊", "AI Chat": "🤖"}
-    app_mode = st.radio(
-        "Navigation",
-        list(_NAV_ICONS.keys()),
-        format_func=lambda x: f"{_NAV_ICONS[x]}  {x}",
-        key="top_app_mode",
-        label_visibility="collapsed",
-    )
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div style="color:#8B9EC4;font-size:.72rem;text-transform:uppercase;'
-        'letter-spacing:1.5px;padding:4px 0">MLB Analytics Dashboard</div>',
-        unsafe_allow_html=True,
-    )
-# app_mode is already the plain name (format_func only changes display, not stored value)
-
+# Top banner
 st.markdown(
     '<div class="nav-banner">'
     '<span class="nav-title">⚾ <span class="red">BOSWORTH</span> '
     '<span class="blue">ANALYTICS</span> · MLB DASHBOARD</span>'
     '</div>',
     unsafe_allow_html=True,
+)
+# Horizontal nav — styled radio rendered as button tabs
+_NAV_ICONS = {"Player Comparison": "⚾", "Team Comparison": "📊", "AI Chat": "🤖"}
+app_mode = st.radio(
+    "nav",
+    list(_NAV_ICONS.keys()),
+    format_func=lambda x: f"{_NAV_ICONS[x]}  {x}",
+    horizontal=True,
+    key="top_app_mode",
+    label_visibility="collapsed",
 )
 
 # ════════════════════════════════════════════════════════════════════════════════
