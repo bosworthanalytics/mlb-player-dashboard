@@ -218,59 +218,59 @@ st.markdown("""<style>
 .nav-title .blue{color:#5B9BD5}
 
 /* ── Content tab bar — active tab electric blue ── */
-[data-baseweb="tab-list"]{background:#0F1E32 !important;border-radius:8px 8px 0 0;padding:4px 4px 0;
-                           border-bottom:2px solid #1A2E47 !important}
-[data-baseweb="tab"]{color:#8B9EC4 !important;font-weight:600 !important;font-size:.82rem !important;
-                     padding:8px 16px !important}
+[data-baseweb="tab-list"]{background:#0F1E32 !important;border-radius:8px 8px 0 0;
+                           padding:4px 4px 0;border-bottom:2px solid #1A2E47 !important}
+[data-baseweb="tab"]{color:#8B9EC4 !important;font-weight:600 !important;
+                     font-size:.82rem !important;padding:8px 16px !important}
 [aria-selected="true"]{color:#00BFFF !important;border-bottom:2px solid #00BFFF !important}
 
-/* ── Top navigation radio → styled as button tabs ── */
-[data-testid="stRadio"]:has(input[value="Player Comparison"]) > div,
-[data-testid="stRadio"]:has(input[value="Team Comparison"]) > div,
-[data-testid="stRadio"]:has(input[value="AI Chat"]) > div {
-  display:flex;gap:6px;background:#0F1E32;padding:5px;
-  border-radius:10px;border:1px solid #1A2E47;margin-bottom:14px}
-/* All nav radio labels */
-div[data-testid="stRadio"] > div > label {
-  flex:1;text-align:center;padding:9px 18px;border-radius:8px;
+/* ── Top nav radio — scoped ONLY to the nav radio via :has() ── */
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) > div {
+  display:flex;gap:6px;background:#0A1525;padding:6px;
+  border-radius:10px;border:1px solid #1A2E47;margin-bottom:16px}
+/* Nav labels only */
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) label {
+  flex:1;text-align:center;padding:10px 14px;border-radius:8px;
   font-weight:700;font-size:.85rem;color:#8B9EC4;cursor:pointer;
-  transition:background .15s,color .15s;border:1px solid transparent}
-div[data-testid="stRadio"] > div > label:hover{
+  white-space:nowrap;transition:background .15s,color .15s;border:1px solid transparent}
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) label:hover {
   background:#1A2E47;color:#F4F8FF}
-div[data-testid="stRadio"] > div > label:has(input:checked){
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) label:has(input:checked) {
   background:#C8102E;color:#fff !important;border-color:#C8102E}
-/* Hide the actual radio circle dots */
-div[data-testid="stRadio"] > div > label > div:first-child{display:none !important}
+/* Hide radio dots — nav only */
+[data-testid="stRadio"]:has(input[value="Player Comparison"]) label > div:first-child {
+  display:none !important}
 
-/* ── Multiselect tags (season selector) ── */
+/* ── Multiselect season tags — fix truncation & color ── */
 [data-baseweb="tag"]{background:#1A2E47 !important;border:1px solid #00BFFF !important;
-                     border-radius:6px !important}
-[data-baseweb="tag"] span{color:#F4F8FF !important;font-weight:600}
+                     border-radius:6px !important;min-width:72px !important;
+                     padding:2px 8px !important;overflow:visible !important}
+[data-baseweb="tag"] span{color:#F4F8FF !important;font-weight:600;overflow:visible !important}
 [data-baseweb="tag"] button svg{fill:#8B9EC4 !important}
-[data-baseweb="select"]{background:#0F1E32 !important}
 [data-baseweb="select"] > div{background:#0F1E32 !important;border-color:#1A2E47 !important}
-[data-baseweb="input"]{background:#0F1E32 !important}
 
-/* ── Sidebar (keep hidden) ── */
+/* ── Sidebar hidden ── */
 [data-testid="stSidebar"]{display:none}
 [data-testid="collapsedControl"]{display:none !important}
 [data-testid="stSidebarCollapseButton"]{display:none !important}
 
-/* Streamlit metric overrides */
+/* ── Metrics ── */
 [data-testid="stMetric"]{background:#0F1E32;border-radius:10px;padding:12px 16px;
                           border:1px solid #1A2E47}
 [data-testid="stMetricLabel"]{color:#8B9EC4 !important;font-size:.78rem !important;
                                text-transform:uppercase;letter-spacing:1px}
-[data-testid="stMetricValue"]{color:#F4F8FF !important;font-size:1.5rem !important;font-weight:800 !important}
+[data-testid="stMetricValue"]{color:#F4F8FF !important;font-size:1.5rem !important;
+                               font-weight:800 !important}
 [data-testid="stMetricDelta"]{font-size:.78rem !important}
 
-/* Button overrides */
+/* ── All buttons default ── */
 .stButton>button{background:#C8102E;color:#fff;border:none;border-radius:8px;
                  font-weight:700;letter-spacing:.5px;transition:background .2s}
 .stButton>button:hover{background:#A00D25}
 
-/* Selectbox / radio */
-[data-baseweb="select"] div{background:#0F1E32 !important;border-color:#1A2E47 !important;color:#F4F8FF !important}
+/* ── Selectbox inputs ── */
+[data-baseweb="select"] div{background:#0F1E32 !important;border-color:#1A2E47 !important;
+                             color:#F4F8FF !important}
 </style>""", unsafe_allow_html=True)
 
 # ── Particle animation background ─────────────────────────────────────────────
@@ -776,8 +776,13 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
-# Horizontal nav — styled radio rendered as button tabs
-_NAV_ICONS = {"Player Comparison": "⚾", "Team Comparison": "📊", "AI Chat": "🤖"}
+# Horizontal nav — scoped CSS turns this radio into a styled button bar
+_NAV_ICONS = {
+    "Player Comparison": "⚾",
+    "Team Comparison":   "📊",
+    "Scouting Report":   "📋",
+    "AI Chat":           "🤖",
+}
 app_mode = st.radio(
     "nav",
     list(_NAV_ICONS.keys()),
@@ -989,6 +994,117 @@ You can also discuss any other MLB players in general based on your training kno
         if st.button("Clear Chat", key="clear_chat"):
             st.session_state.chat_history = []
             st.rerun()
+    st.stop()
+
+# ════════════════════════════════════════════════════════════════════════════════
+# SCOUTING REPORT MODE
+# ════════════════════════════════════════════════════════════════════════════════
+if app_mode == "Scouting Report":
+    st.markdown('<div class="section-header">Player Scouting Report — 20-80 Tool Grades</div>',
+                unsafe_allow_html=True)
+
+    _src1, _src2, _src3 = st.columns([1, 2, 3])
+    with _src1:
+        mode = st.radio("Type", ["Hitters", "Pitchers"], horizontal=True, key="sr_mode")
+    with _src2:
+        _sr_seas = st.multiselect("Seasons", ALL_SEASONS, default=[2025, 2026], key="sr_seasons")
+        sel_seasons = tuple(sorted(_sr_seas)) if _sr_seas else (2026,)
+
+    with st.spinner("Loading players..."):
+        all_fg = load_mlb_hitting(sel_seasons) if mode == "Hitters" else load_mlb_pitching(sel_seasons)
+        try:
+            _sr_adv = (load_fangraphs_batting(sel_seasons) if mode == "Hitters"
+                       else load_fangraphs_pitching(sel_seasons))
+            if not _sr_adv.empty:
+                all_fg["IDmlb"]  = pd.to_numeric(all_fg["IDmlb"],  errors="coerce")
+                _sr_adv["IDmlb"] = pd.to_numeric(_sr_adv["IDmlb"], errors="coerce")
+                all_fg = all_fg.merge(_sr_adv, on=["IDmlb", "Season"], how="left")
+        except Exception:
+            pass
+
+    _sr_plist = sorted(all_fg["Name"].dropna().unique().tolist()) if not all_fg.empty else []
+    _srp1, _srp2 = st.columns(2)
+    with _srp1:
+        sr_pa = st.selectbox("Player A", _sr_plist, key="sr_pa")
+    with _srp2:
+        sr_pb = st.selectbox("Player B", [p for p in _sr_plist if p != sr_pa], key="sr_pb")
+
+    SR_PLAYERS = [sr_pa, sr_pb]
+    SR_COLORS  = {sr_pa: PA_COL, sr_pb: PB_COL}
+
+    def _sr_grade_color(g):
+        if g >= 70: return "#1a7a4a"
+        if g >= 60: return "#2ecc71"
+        if g >= 55: return "#7dce82"
+        if g >= 50: return "#95a5a6"
+        if g >= 45: return "#e67e22"
+        if g >= 40: return "#e74c3c"
+        return "#922b21"
+
+    def _sr_render(player):
+        grades = _compute_scouting_grades(player)
+        if grades is None:
+            st.info(f"Not enough data for {player}.")
+            return
+        st.markdown(
+            f'<div style="font-size:1rem;font-weight:800;color:#F4F8FF;'
+            f'margin-bottom:8px;letter-spacing:.5px">{player}</div>',
+            unsafe_allow_html=True)
+        for tool, val in grades.items():
+            gc = _sr_grade_color(val)
+            st.markdown(
+                f'<div class="grade-row">'
+                f'<span class="grade-tool">{tool}</span>'
+                f'<span class="grade-pill" style="background:{gc};">{val}</span>'
+                f'<span style="color:{gc};font-weight:700;font-size:.8rem;min-width:100px">'
+                f'{grade_label(val)}</span>'
+                f'</div>', unsafe_allow_html=True)
+        ofp = round(sum(grades.values()) / len(grades))
+        gc_ofp = _sr_grade_color(ofp)
+        st.markdown(
+            f'<div style="margin-top:12px;padding:14px;background:{CARD_BG};border-radius:10px;'
+            f'text-align:center;border:1px solid {LINE_CLR}">'
+            f'<div style="color:{SUBTEXT};font-size:.72rem;letter-spacing:1.5px;text-transform:uppercase;'
+            f'margin-bottom:4px">Overall Future Potential</div>'
+            f'<span style="color:{gc_ofp};font-size:2.4rem;font-weight:900">{ofp}</span>'
+            f'<span style="color:{gc_ofp};font-size:.9rem;font-weight:700;margin-left:10px">'
+            f'{grade_label(ofp)}</span>'
+            f'</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        _sr_render(sr_pa)
+    with sc2:
+        _sr_render(sr_pb)
+
+    # Radar chart
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Tool Grade Radar Comparison</div>', unsafe_allow_html=True)
+    _sr_grades = {p: _compute_scouting_grades(p) for p in SR_PLAYERS}
+    if any(g is not None for g in _sr_grades.values()):
+        _tools = list(next(g for g in _sr_grades.values() if g is not None).keys())
+        _radar_ind = [{"name": t, "max": 80, "min": 20} for t in _tools]
+        _radar_series = []
+        for _p in SR_PLAYERS:
+            _gd = _sr_grades.get(_p)
+            if _gd is None: continue
+            _radar_series.append({
+                "name": _p, "type": "radar",
+                "data": [{"value": [_gd.get(t, 50) for t in _tools], "name": _p,
+                          "lineStyle":  {"color": SR_COLORS[_p], "width": 2},
+                          "areaStyle":  {"color": SR_COLORS[_p], "opacity": 0.15},
+                          "itemStyle":  {"color": SR_COLORS[_p]}}]
+            })
+        ech({
+            **_base("20-80 Tool Grades"),
+            "legend": {"bottom": 4, "textStyle": {"color": TEXT}, "data": SR_PLAYERS},
+            "radar":  {"indicator": _radar_ind, "shape": "polygon",
+                       "splitLine": {"lineStyle": {"color": LINE_CLR}},
+                       "splitArea": {"areaStyle": {"color": [CARD_BG, "#0A1A2E"]}},
+                       "axisName":  {"color": TEXT, "fontSize": 11}},
+            "series": _radar_series,
+        }, height=420)
     st.stop()
 
 # ── Controls (top of page, no sidebar needed) ──────────────────────────────────
