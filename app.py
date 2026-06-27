@@ -1407,12 +1407,12 @@ var cv=document.getElementById('sc'),ctx=cv.getContext('2d');
 var W=cv.width,H=cv.height,SX=W/250,SY=H/260;
 function px(x){{return x*SX;}} function py(y){{return y*SY;}}
 ctx.fillStyle='{CARD_BG}';ctx.fillRect(0,0,W,H);
-ctx.beginPath();ctx.moveTo(px(6),py(40));
-ctx.quadraticCurveTo(px(125),py(0),px(244),py(40));
+ctx.beginPath();ctx.moveTo(px(-35),py(35));
+ctx.quadraticCurveTo(px(125),py(-5),px(285),py(35));
 ctx.strokeStyle='#C8102E';ctx.lineWidth=2;ctx.stroke();
 ctx.beginPath();
-ctx.moveTo(px(125),py(208));ctx.lineTo(px(6),py(40));
-ctx.moveTo(px(125),py(208));ctx.lineTo(px(244),py(40));
+ctx.moveTo(px(125),py(208));ctx.lineTo(px(-35),py(35));
+ctx.moveTo(px(125),py(208));ctx.lineTo(px(285),py(35));
 ctx.strokeStyle='#FFFFFF44';ctx.lineWidth=1.5;ctx.stroke();
 ctx.beginPath();ctx.arc(px(125),py(152),px(46),0,Math.PI*2);
 ctx.strokeStyle='#C8A06033';ctx.lineWidth=1;ctx.stroke();
