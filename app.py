@@ -1483,12 +1483,16 @@ hits.forEach(function(h){{
                 st.markdown(_dh2, unsafe_allow_html=True)
 
     # ── Bat Speed & Swing Profile (Hitters — 2024+ Statcast) ─────────────────────
-    if mode == "Hitters" and not _sr_sc_raw.empty and "bat_speed" in _sr_sc_raw.columns:
-        _bs_raw = _sr_sc_raw[_sr_sc_raw["bat_speed"].notna()].copy()
-        if "pitch_type" in _bs_raw.columns:
-            _bs_raw = _bs_raw[_bs_raw["pitch_type"].notna() & (_bs_raw["pitch_type"].str.strip() != "")]
+    if mode == "Hitters":
+        st.markdown('<div class="section-header">Bat Speed & Swing Profile</div>', unsafe_allow_html=True)
+        _bs_has_data = (not _sr_sc_raw.empty and "bat_speed" in _sr_sc_raw.columns)
+        if _bs_has_data:
+            _bs_raw = _sr_sc_raw[_sr_sc_raw["bat_speed"].notna()].copy()
+            if "pitch_type" in _bs_raw.columns:
+                _bs_raw = _bs_raw[_bs_raw["pitch_type"].notna() & (_bs_raw["pitch_type"].str.strip() != "")]
+        else:
+            _bs_raw = pd.DataFrame()
         if not _bs_raw.empty:
-            st.markdown('<div class="section-header">Bat Speed & Swing Profile</div>', unsafe_allow_html=True)
             _PT_CLR_B = ["#C8102E","#00BFFF","#C4A962","#2ecc71","#8B9EC4","#FFA726","#EF5350","#FF69B4"]
             _bs_agg = (_bs_raw.groupby("pitch_type")
                        .agg(n=("bat_speed","count"), bat_speed=("bat_speed","mean"))
@@ -1551,6 +1555,13 @@ hits.forEach(function(h){{
                         f'</div>',
                         unsafe_allow_html=True
                     )
+        else:
+            st.markdown(
+                '<div style="background:#0F1E32;border:1px solid #1A2E47;border-radius:10px;'
+                'padding:18px;color:#8B9EC4;font-size:.85rem;text-align:center;margin-bottom:16px">'
+                'Bat speed data is available for 2024+ seasons. Select 2024 or later to view.</div>',
+                unsafe_allow_html=True
+            )
 
     # ── Tool Grades + OFP ────────────────────────────────────────────────────────
     if grades:
@@ -1642,16 +1653,20 @@ hits.forEach(function(h){{
                     st.markdown(_stat_table_html(_a_rows, _a_heads), unsafe_allow_html=True)
 
     # ── Pitch Movement + Arm Slot (Pitchers only) ────────────────────────────────
-    if mode == "Pitchers" and not _sr_sc_raw.empty:
+    if mode == "Pitchers":
+        st.markdown('<div class="section-header">Pitch Movement & Arm Slot</div>', unsafe_allow_html=True)
         _mov_need = ["pitch_type", "pfx_x", "pfx_z"]
-        if all(c in _sr_sc_raw.columns for c in _mov_need):
+        _mov_has_data = (not _sr_sc_raw.empty and
+                         all(c in _sr_sc_raw.columns for c in _mov_need))
+        if _mov_has_data:
             _mov_raw = _sr_sc_raw[
                 _mov_need + [c for c in ["release_pos_x","release_pos_z","p_throws"]
                              if c in _sr_sc_raw.columns]
             ].dropna(subset=_mov_need).copy()
             _mov_raw = _mov_raw[_mov_raw["pitch_type"].str.strip() != ""]
-            if not _mov_raw.empty:
-                st.markdown('<div class="section-header">Pitch Movement & Arm Slot</div>', unsafe_allow_html=True)
+        else:
+            _mov_raw = pd.DataFrame()
+        if not _mov_raw.empty:
                 _PT_CLR = ["#C8102E","#00BFFF","#C4A962","#2ecc71","#8B9EC4","#FFA726","#EF5350","#FF69B4"]
                 _mov_raw = _mov_raw.copy()
                 _mov_raw["hbreak"] = _mov_raw["pfx_x"] * 12
@@ -1686,9 +1701,6 @@ hits.forEach(function(h){{
                             "axisLabel":{"color":SUBTEXT,"fontSize":9},
                             "splitLine":{"lineStyle":{"color":LINE_CLR}},
                             "axisLine":{"lineStyle":{"color":LINE_CLR}},
-                            "markLine":{"silent":True,"symbol":"none",
-                                        "lineStyle":{"color":SUBTEXT,"type":"dashed","width":1},
-                                        "data":[{"xAxis":0}],"label":{"show":False}},
                         },
                         "yAxis": {
                             "type":"value","name":"Vert. Break (in.)",
@@ -1696,11 +1708,13 @@ hits.forEach(function(h){{
                             "axisLabel":{"color":SUBTEXT,"fontSize":9},
                             "splitLine":{"lineStyle":{"color":LINE_CLR}},
                             "axisLine":{"lineStyle":{"color":LINE_CLR}},
+                        },
+                        "series": _mov_series + [{
+                            "type":"scatter","data":[],"silent":True,
                             "markLine":{"silent":True,"symbol":"none",
                                         "lineStyle":{"color":SUBTEXT,"type":"dashed","width":1},
-                                        "data":[{"yAxis":0}],"label":{"show":False}},
-                        },
-                        "series": _mov_series,
+                                        "data":[{"xAxis":0},{"yAxis":0}],"label":{"show":False}},
+                        }],
                     }, height=330)
                 with _mov_c2:
                     if "release_pos_x" in _mov_raw.columns and "release_pos_z" in _mov_raw.columns:
@@ -1743,6 +1757,13 @@ hits.forEach(function(h){{
                                 ],
                             }],
                         }, height=330)
+        else:
+            st.markdown(
+                '<div style="background:#0F1E32;border:1px solid #1A2E47;border-radius:10px;'
+                'padding:18px;color:#8B9EC4;font-size:.85rem;text-align:center;margin-bottom:16px">'
+                'Statcast pitch movement data not available for the selected season.</div>',
+                unsafe_allow_html=True
+            )
 
     # ── Season Stats Table ───────────────────────────────────────────────────────
     st.markdown('<div class="section-header">Season Stats</div>', unsafe_allow_html=True)
@@ -2069,15 +2090,17 @@ for col_w, player in zip([hcols[0], hcols[2]], PLAYERS):
         if _aid in _aw_map:
             _al, _ac = _aw_map[_aid]
             _aw_counts[_al] = (_aw_counts.get(_al,(0,_ac))[0]+1, _ac)
-    _awards_html = ""
+    _awards_html = '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px">'
     if _aw_counts:
-        _awards_html = '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px">'
         for _al, (_acnt, _ac) in _aw_counts.items():
             _px = f"{_acnt}x " if _acnt > 1 else ""
             _awards_html += (f'<div style="background:rgba(0,0,0,0.35);border:1px solid {_ac};'
                              f'border-radius:12px;padding:3px 10px;font-size:.63rem;font-weight:700;'
                              f'color:{_ac};white-space:nowrap">{_px}{_al}</div>')
-        _awards_html += '</div>'
+    else:
+        _awards_html += ('<div style="font-size:.6rem;color:#8B9EC4;font-style:italic;'
+                         'padding:4px 0">No major awards</div>')
+    _awards_html += '</div>'
     with col_w:
         st.markdown(f"""
         <div class="player-card" style="border-top-color:{color}">
