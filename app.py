@@ -873,6 +873,7 @@ _NAV_ICONS = {
     "Player Comparison": "⚾",
     "Team Comparison":   "📊",
     "Scouting Report":   "📋",
+    "Projections":       "🔮",
     "AI Chat":           "🤖",
 }
 app_mode = st.radio(
@@ -883,6 +884,163 @@ app_mode = st.radio(
     key="top_app_mode",
     label_visibility="collapsed",
 )
+
+# ════════════════════════════════════════════════════════════════════════════════
+# PROJECTIONS MODE — rest-of-season wOBA / FIP from the trained model
+# ════════════════════════════════════════════════════════════════════════════════
+if app_mode == "Projections":
+    import os as _os
+    _PDIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "output")
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _load_proj(fname):
+        p = _os.path.join(_PDIR, fname)
+        return pd.read_csv(p) if _os.path.exists(p) else pd.DataFrame()
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _load_metrics():
+        p = _os.path.join(_PDIR, "proj_model_metrics.json")
+        if _os.path.exists(p):
+            with open(p) as f: return json.load(f)
+        return {}
+
+    st.markdown('<div class="section-header">Rest-of-Season Projections</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="color:#8B9EC4;font-size:.9rem;margin:-6px 0 14px">'
+        'Machine-learning projections of each qualified player\'s <b>rest-of-2026</b> performance '
+        '— wOBA for hitters, FIP for pitchers. Trained on 2021–2025 (pre/post mid-season splits), '
+        'validated out-of-sample on 2025. The model regresses hot/cold starts toward true talent.'
+        '</div>', unsafe_allow_html=True)
+
+    _pmode = st.radio("ptype", ["Hitters", "Pitchers"], horizontal=True,
+                      key="proj_type", label_visibility="collapsed")
+    _is_hit = _pmode == "Hitters"
+    _pdf = _load_proj("ros_projections_2026_hitters.csv" if _is_hit
+                      else "ros_projections_2026_pitchers.csv")
+
+    if _pdf.empty:
+        st.warning("Projection data not found. Run generate_2026_projections.py to build it.")
+        st.stop()
+
+    _proj_col  = "proj_wOBA" if _is_hit else "proj_FIP"
+    _pre_col   = "pre_wOBA"  if _is_hit else "pre_FIP"
+    _prior_col = "prior_wOBA" if _is_hit else "prior_FIP"
+    _marcel_col = "marcel_wOBA" if _is_hit else "marcel_FIP"
+    _fmt = "{:.3f}" if _is_hit else "{:.2f}"
+    _better_up = _is_hit            # hitters: higher wOBA better; pitchers: lower FIP better
+
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        _q = st.text_input("Search player", "", key="proj_search",
+                           placeholder="Filter by name…").strip().lower()
+    with c2:
+        _topn = st.number_input("Show top", 10, 200, 30, step=10, key="proj_topn")
+
+    _view = _pdf.copy()
+    if _q:
+        _view = _view[_view["name"].str.lower().str.contains(_q)]
+    _view = _view.sort_values(_proj_col, ascending=not _better_up).head(int(_topn)).reset_index(drop=True)
+
+    # ── Leaderboard table ────────────────────────────────────────────────────
+    _heads = ["#", "Player", "Team", "Age", "Current", "2025", "Marcel", "Proj ROS", "Δ"]
+    _rows_html = ""
+    for _i, _r in _view.iterrows():
+        _cur = _r[_pre_col]; _pj = _r[_proj_col]
+        _delta = _pj - _cur
+        # green = projection improves on current pace; red = regresses
+        _good = (_delta > 0) if _better_up else (_delta < 0)
+        _dc = "#2ecc71" if _good else "#EF5350"
+        _dsign = "+" if _delta > 0 else ""
+        _prior_v = _fmt.format(_r[_prior_col]) if pd.notna(_r[_prior_col]) else "—"
+        _rows_html += (
+            f'<tr style="border-bottom:1px solid #1A2E47">'
+            f'<td style="padding:8px 10px;color:#8B9EC4;font-weight:700">{_i+1}</td>'
+            f'<td style="padding:8px 10px;color:#F4F8FF;font-weight:700">{_r["name"]}</td>'
+            f'<td style="padding:8px 10px;color:#8B9EC4;font-size:.82rem">{_r.get("team","")}</td>'
+            f'<td style="padding:8px 10px;color:#8B9EC4">{int(_r["age"]) if pd.notna(_r["age"]) else "—"}</td>'
+            f'<td style="padding:8px 10px;color:#C9D6EC;font-family:monospace">{_fmt.format(_cur)}</td>'
+            f'<td style="padding:8px 10px;color:#8B9EC4;font-family:monospace">{_prior_v}</td>'
+            f'<td style="padding:8px 10px;color:#8B9EC4;font-family:monospace">{_fmt.format(_r[_marcel_col])}</td>'
+            f'<td style="padding:8px 10px;color:#F4F8FF;font-weight:900;font-family:monospace;'
+            f'background:rgba(200,16,46,0.10)">{_fmt.format(_pj)}</td>'
+            f'<td style="padding:8px 10px;color:{_dc};font-family:monospace;font-weight:700">'
+            f'{_dsign}{_fmt.format(_delta)}</td></tr>'
+        )
+    _hdr_html = "".join(
+        f'<th style="padding:9px 10px;text-align:left;color:#C8102E;font-size:.62rem;'
+        f'letter-spacing:1.2px;text-transform:uppercase;border-bottom:2px solid #C8102E">{h}</th>'
+        for h in _heads)
+    st.markdown(
+        f'<div style="overflow-x:auto;background:#0F1E32;border:1px solid #1A2E47;border-radius:12px">'
+        f'<table style="width:100%;border-collapse:collapse;font-size:.86rem">'
+        f'<thead><tr>{_hdr_html}</tr></thead><tbody>{_rows_html}</tbody></table></div>',
+        unsafe_allow_html=True)
+    st.caption("Current = 2026 pace through cutoff · 2025 = prior-season rate · "
+               "Marcel = baseline projection · **Proj ROS = model** · Δ = model vs current pace")
+
+    # ── Model accuracy + feature importance ──────────────────────────────────
+    st.markdown('<div class="section-header" style="margin-top:26px">How Accurate Is It?</div>',
+                unsafe_allow_html=True)
+    _met = _load_metrics()
+    _mk = "hitters" if _is_hit else "pitchers"
+    ac1, ac2 = st.columns([1, 1])
+    with ac1:
+        _mm = _met.get(_mk, {})
+        if _mm:
+            _dep = _mm.get("_deployed", "Ridge regression")
+            _order = ["Naive (current stat)", "Marcel baseline", "Ridge regression", "Gradient boosting"]
+            _mr = ""
+            for _name in _order:
+                if _name not in _mm: continue
+                _v = _mm[_name]
+                _hl = "background:rgba(46,204,113,0.12)" if _name == _dep else ""
+                _tag = " ✓ deployed" if _name == _dep else ""
+                _mr += (f'<tr style="border-bottom:1px solid #1A2E47;{_hl}">'
+                        f'<td style="padding:7px 10px;color:#F4F8FF">{_name}{_tag}</td>'
+                        f'<td style="padding:7px 10px;color:#C9D6EC;font-family:monospace;text-align:right">{_v["RMSE"]:.4f}</td>'
+                        f'<td style="padding:7px 10px;color:#C9D6EC;font-family:monospace;text-align:right">{_v["R2"]:.3f}</td></tr>')
+            st.markdown(
+                f'<div style="background:#0F1E32;border:1px solid #1A2E47;border-radius:12px;overflow:hidden">'
+                f'<table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+                f'<thead><tr>'
+                f'<th style="padding:9px 10px;text-align:left;color:#C8102E;font-size:.6rem;letter-spacing:1px;text-transform:uppercase">Model (2025 holdout)</th>'
+                f'<th style="padding:9px 10px;text-align:right;color:#C8102E;font-size:.6rem;letter-spacing:1px;text-transform:uppercase">RMSE</th>'
+                f'<th style="padding:9px 10px;text-align:right;color:#C8102E;font-size:.6rem;letter-spacing:1px;text-transform:uppercase">R²</th>'
+                f'</tr></thead><tbody>{_mr}</tbody></table></div>', unsafe_allow_html=True)
+            st.caption("Lower RMSE = better. Note the naive 'just use current stats' approach has "
+                       "**negative R²** — worse than guessing the league average — which is why "
+                       "regression-to-the-mean matters.")
+    with ac2:
+        _imp = _load_proj("proj_feature_importance.csv")
+        _imp = _imp[_imp["kind"] == _mk].sort_values("importance").tail(8) if not _imp.empty else _imp
+        if not _imp.empty:
+            ech({
+                **_base("Top Features (permutation importance)"),
+                "legend": {"show": False},
+                "grid": {"left": "32%", "right": "8%", "top": "14%", "bottom": "6%"},
+                "xAxis": {"type": "value", "axisLabel": {"color": SUBTEXT, "fontSize": 9},
+                          "splitLine": {"lineStyle": {"color": LINE_CLR}},
+                          "axisLine": {"lineStyle": {"color": LINE_CLR}}},
+                "yAxis": {"type": "category", "data": _imp["feature"].tolist(),
+                          "axisLabel": {"color": TEXT, "fontSize": 10},
+                          "axisLine": {"lineStyle": {"color": LINE_CLR}}},
+                "series": [{"type": "bar", "barMaxWidth": 22,
+                            "data": [round(float(v), 5) for v in _imp["importance"]],
+                            "itemStyle": {"color": "#C8102E", "borderRadius": [0, 4, 4, 0]}}],
+            }, height=300)
+
+    with st.expander("Methodology & limitations"):
+        st.markdown(
+            "- **Target:** rest-of-season wOBA (hitters) / FIP (pitchers), computed from raw "
+            "components so it splits cleanly by date.\n"
+            "- **Features:** pre-cutoff production + quality rates, prior-season baseline, age.\n"
+            "- **Training:** 2021–2025, multiple mid-season cutoffs; **validated out-of-sample on 2025** "
+            "(temporal holdout — no future leakage).\n"
+            "- **Model:** a regularized linear model (Ridge) won a head-to-head vs gradient boosting "
+            "and the Marcel baseline, so it's the one deployed.\n"
+            "- **Limitations:** assumes continued playing time (injury/demotion not modeled); "
+            "park/role context is simplified; 2026 projections update as the season progresses.")
+    st.stop()
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TEAM COMPARISON MODE
