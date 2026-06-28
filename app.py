@@ -769,6 +769,32 @@ def get_player_awards(mlbam_id):
     except Exception:
         return []
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_player_career(mlbam_id):
+    """Career hitting/pitching totals + bio via MLB Stats API."""
+    if not mlbam_id:
+        return {}
+    out = {}
+    try:
+        person = requests.get(f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}",
+                              headers=MLB_HEADERS, timeout=10).json().get("people",[{}])[0]
+        out["debut"]  = person.get("mlbDebutDate","")
+        out["pos"]    = (person.get("primaryPosition") or {}).get("abbreviation","")
+        out["bats"]   = (person.get("batSide") or {}).get("code","")
+        out["throws"] = (person.get("pitchHand") or {}).get("code","")
+    except Exception:
+        pass
+    for grp in ("hitting", "pitching"):
+        try:
+            sp = requests.get(
+                f"https://statsapi.mlb.com/api/v1/people/{mlbam_id}/stats?stats=career&group={grp}",
+                headers=MLB_HEADERS, timeout=10).json().get("stats",[{}])[0].get("splits",[])
+            if sp:
+                out[grp] = sp[0].get("stat", {})
+        except Exception:
+            pass
+    return out
+
 def agg_statcast_hit_monthly(sc):
     if sc.empty: return pd.DataFrame()
     rows = []
@@ -1081,9 +1107,13 @@ FIELDING / DEFENSE LEADERS ({chat_season}):
 DRS=Defensive Runs Saved, OAA=Outs Above Average, UZR=Ultimate Zone Rating, Def=total
 defensive runs; higher is better for DRS/OAA/UZR/Def. More errors = worse defense.)
 
-For career totals, all-time/active leaders, awards, and Hall-of-Fame type questions, use your
-baseball knowledge. If a player's exact {chat_season} line is needed and provided below in a
-"Players referenced" note, prefer those numbers."""
+When the user names specific players, a "PLAYERS REFERENCED" block below provides their real
+CAREER totals (MLB Stats API) and current-season line. For "compare career metrics" questions,
+USE those career numbers directly — build the comparison table from them and give a verdict. Do
+NOT say you lack the data or fall back to estimates when a career block is provided.
+
+For all-time leaders, awards, and Hall-of-Fame questions where no block is provided, use your
+baseball knowledge. Never invent a number with a "~" estimate if real data is in the block."""
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -1124,21 +1154,63 @@ baseball knowledge. If a player's exact {chat_season} line is needed and provide
             if dparts: out.append("fielding " + ", ".join(dparts))
         return f"{name} ({chat_season}): " + " | ".join(out) if out else ""
 
+    def _mlbam_for(name):
+        for df in (hit_fg, pit_fg):
+            if not df.empty and "IDmlb" in df.columns and name in set(df["Name"]):
+                v = df[df["Name"] == name]["IDmlb"].iloc[0]
+                try:
+                    if pd.notna(v): return int(v)
+                except Exception:
+                    pass
+        return None
+
+    def _career_str(name):
+        mid = _mlbam_for(name)
+        if not mid: return ""
+        c = get_player_career(mid)
+        if not c: return ""
+        segs = []
+        h = c.get("hitting")
+        if h:
+            ks = [("G","gamesPlayed"),("PA","plateAppearances"),("AB","atBats"),("H","hits"),
+                  ("AVG","avg"),("OBP","obp"),("SLG","slg"),("OPS","ops"),("HR","homeRuns"),
+                  ("RBI","rbi"),("SB","stolenBases"),("BB","baseOnBalls"),("SO","strikeOuts")]
+            seg = ", ".join(f"{l}={h.get(k)}" for l,k in ks if h.get(k) not in (None,""))
+            if seg: segs.append("career hitting: " + seg)
+        p = c.get("pitching")
+        if p:
+            ks = [("G","gamesPlayed"),("GS","gamesStarted"),("W","wins"),("L","losses"),
+                  ("SV","saves"),("IP","inningsPitched"),("ERA","era"),("WHIP","whip"),
+                  ("SO","strikeOuts"),("HR","homeRuns")]
+            seg = ", ".join(f"{l}={p.get(k)}" for l,k in ks if p.get(k) not in (None,""))
+            if seg: segs.append("career pitching: " + seg)
+        if not segs: return ""
+        meta = []
+        if c.get("debut"): meta.append(f"MLB debut {c['debut']}")
+        if c.get("pos"):   meta.append(c["pos"])
+        head = name + (f" ({'; '.join(meta)})" if meta else "")
+        return head + " — " + " | ".join(segs)
+
     def _find_mentioned_players(msg):
         ml = msg.lower()
         names = set()
-        if not hit_fg.empty: names |= set(hit_fg["Name"].dropna())
-        if not pit_fg.empty: names |= set(pit_fg["Name"].dropna())
-        if not fld_basic.empty: names |= set(fld_basic["Name"].dropna())
-        found = []
+        for df in (hit_fg, pit_fg, fld_basic):
+            if not df.empty: names |= set(df["Name"].dropna())
+        matched = []
         for name in names:
             toks = name.lower().split()
             if len(toks) < 2: continue
-            last = toks[-1]
-            if len(last) >= 4 and last in ml:
-                line = _stats_line(name)
-                if line: found.append(line)
-        return found[:6]
+            first, last = toks[0], toks[-1]
+            # full name present, OR first+last both present (handles short last names like "Lee"),
+            # OR a distinctive last name on its own
+            if name.lower() in ml or (first in ml and last in ml) or (len(last) >= 5 and last in ml):
+                matched.append(name)
+        matched = list(dict.fromkeys(matched))[:8]
+        out = []
+        for nm in matched:
+            block = [x for x in (_career_str(nm), _stats_line(nm)) if x]
+            if block: out.append("\n".join(block))
+        return out
 
     if prompt := st.chat_input("Ask any baseball question..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
@@ -1151,7 +1223,7 @@ baseball knowledge. If a player's exact {chat_season} line is needed and provide
                     extra = _find_mentioned_players(prompt)
                     dynamic_sys = sys_prompt
                     if extra:
-                        dynamic_sys += "\n\nPlayers referenced (live " + str(chat_season) + " lines):\n" + "\n".join(extra)
+                        dynamic_sys += "\n\nPLAYERS REFERENCED (real career totals + current line):\n\n" + "\n\n".join(extra)
                     client = _anthropic.Anthropic(api_key=_ANT_KEY)
                     resp = client.messages.create(
                         model="claude-haiku-4-5-20251001",
