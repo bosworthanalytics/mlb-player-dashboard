@@ -490,6 +490,64 @@ def load_fangraphs_pitching(seasons_tuple):
     return pd.DataFrame(frames) if frames else pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def load_mlb_fielding(seasons_tuple):
+    """Season fielding stats (errors, assists, putouts, DP, fielding%) via MLB Stats API."""
+    frames = []
+    for season in seasons_tuple:
+        url = (f"https://statsapi.mlb.com/api/v1/stats"
+               f"?stats=season&group=fielding&gameType=R&season={season}"
+               f"&sportId=1&limit=5000&playerPool=All")
+        try:
+            splits = requests.get(url, headers=MLB_HEADERS, timeout=20).json()\
+                             .get("stats",[{}])[0].get("splits",[])
+        except Exception as e:
+            raise RuntimeError(f"MLB Stats API failed for {season}: {e}")
+        rows = []
+        for sp in splits:
+            p = sp.get("player", {}); t = sp.get("team", {}); s = sp.get("stat", {})
+            pos = (sp.get("position") or {}).get("abbreviation", "")
+            try: inn = float(s.get("innings", "0") or 0)
+            except Exception: inn = 0.0
+            rows.append({
+                "Name": p.get("fullName",""), "IDmlb": p.get("id"),
+                "Team": t.get("name",""), "Season": season, "Pos": pos,
+                "E": int(s.get("errors",0)), "A": int(s.get("assists",0)),
+                "PO": int(s.get("putOuts",0)), "DP": int(s.get("doublePlays",0)),
+                "Chances": int(s.get("chances",0)), "Inn": inn,
+                "FPCT": float(s.get("fielding","0") or 0),
+            })
+        if rows:
+            frames.append(pd.DataFrame(rows))
+    if not frames:
+        raise RuntimeError("MLB Stats API returned no fielding data.")
+    return pd.concat(frames, ignore_index=True)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_fangraphs_fielding(seasons_tuple):
+    """Advanced defense (DRS, UZR, UZR/150, OAA, Def runs) from FanGraphs API."""
+    frames = []
+    for season in seasons_tuple:
+        url = (f"https://www.fangraphs.com/api/leaders/major-league/data"
+               f"?pos=all&stats=fld&lg=all&qual=0&season={season}&season1={season}"
+               f"&month=0&hand=&team=0&pageitems=2000000&pagenum=1"
+               f"&ind=0&rost=0&players=&type=1&postseason=&sortdir=default&sortstat=Def")
+        try:
+            r = requests.get(url, headers=_FG_HEADERS, timeout=25)
+            r.raise_for_status()
+            for row in r.json().get("data", []):
+                mid = row.get("xMLBAMID")
+                if not mid: continue
+                frames.append({"IDmlb": int(mid), "Season": int(season),
+                    "Name": row.get("PlayerName") or row.get("Name"),
+                    "Pos_fg": row.get("Pos"), "Inn": row.get("Inn"),
+                    "DRS": row.get("DRS"), "UZR": row.get("UZR"),
+                    "UZR150": row.get("UZR/150"), "OAA": row.get("OAA"),
+                    "Def": row.get("Defense")})
+        except Exception:
+            pass
+    return pd.DataFrame(frames) if frames else pd.DataFrame()
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_team_stats(season, group="hitting"):
     url = (f"https://statsapi.mlb.com/api/v1/teams/stats"
            f"?stats=season&group={group}&season={season}&sportIds=1&gameType=R")
@@ -901,10 +959,10 @@ if app_mode == "AI Chat":
         st.code('ANTHROPIC_API_KEY = "sk-ant-..."', language="toml")
         st.stop()
 
-    st.caption("Ask anything — current-season league leaders, career comparisons, records, "
-               "or analysis. Example: \"Who leads the league in doubles?\" · "
-               "\"Who's better, Bryce Harper or Mookie Betts?\" · "
-               "\"What active player has the most home runs?\"")
+    st.caption("Ask anything — league leaders (hitting, pitching, defense), career comparisons, "
+               "records, or analysis. Example: \"Who leads the league in doubles?\" · "
+               "\"Who has the most errors?\" · \"Who leads in Outs Above Average?\" · "
+               "\"Who's better, Bryce Harper or Mookie Betts?\"")
     chat_season = st.selectbox("Current-season context", [2026, 2025, 2024, 2023], key="chat_season")
     chat_key = tuple(sorted([chat_season]))
 
@@ -933,6 +991,25 @@ if app_mode == "AI Chat":
                 pass
         except Exception:
             pit_fg = pd.DataFrame()
+        # ── Fielding / defense (basic via MLB API + advanced via FanGraphs) ──────
+        try:
+            _fld_raw = load_mlb_fielding(chat_key)
+            fld_basic = (_fld_raw.groupby("Name", as_index=False)
+                         .agg(E=("E","sum"), A=("A","sum"), PO=("PO","sum"),
+                              DP=("DP","sum"), Inn=("Inn","sum")))
+        except Exception:
+            _fld_raw, fld_basic = pd.DataFrame(), pd.DataFrame()
+        try:
+            _fadv = load_fangraphs_fielding(chat_key)
+            for _c in ["DRS","UZR","UZR150","OAA","Def","Inn"]:
+                if _c in _fadv.columns:
+                    _fadv[_c] = pd.to_numeric(_fadv[_c], errors="coerce")
+            fld_adv = (_fadv.groupby("Name", as_index=False)
+                       .agg(DRS=("DRS","sum"), UZR=("UZR","sum"),
+                            OAA=("OAA","sum"), Def=("Def","sum"), Inn=("Inn","sum"))
+                       if not _fadv.empty else pd.DataFrame())
+        except Exception:
+            _fadv, fld_adv = pd.DataFrame(), pd.DataFrame()
 
     def _lb(df, stat, fmt, asc=False, top=12, qualcol=None, qualmin=0):
         """Compact 'stat: Name val, ...' leaderboard string from a league df."""
@@ -968,8 +1045,19 @@ if app_mode == "AI Chat":
         _lb(pit_fg, "K/9", "{:.1f}", qualcol="IP", qualmin=40),
         _lb(pit_fg, "K%",  "{:.1f}", qualcol="IP", qualmin=40),
     ]
+    _fld_lbs = [
+        _lb(fld_basic, "E",  "{:.0f}"),               # most errors
+        _lb(fld_basic, "A",  "{:.0f}"),               # most assists
+        _lb(fld_basic, "PO", "{:.0f}"),               # most putouts
+        _lb(fld_basic, "DP", "{:.0f}"),               # most double plays
+        _lb(fld_adv,   "DRS","{:.0f}", qualcol="Inn", qualmin=200),  # best (most runs saved)
+        _lb(fld_adv,   "OAA","{:.0f}", qualcol="Inn", qualmin=200),  # outs above average
+        _lb(fld_adv,   "UZR","{:.1f}", qualcol="Inn", qualmin=200),
+        _lb(fld_adv,   "Def","{:.1f}", qualcol="Inn", qualmin=200),  # total defensive runs
+    ]
     _hit_block = "\n".join(x for x in _hit_lbs if x) or "unavailable"
     _pit_block = "\n".join(x for x in _pit_lbs if x) or "unavailable"
+    _fld_block = "\n".join(x for x in _fld_lbs if x) or "unavailable"
 
     sys_prompt = f"""You are an expert MLB analytics assistant for Bosworth Analytics.
 Answer ANY baseball question: current-season league leaders, career comparisons, all-time
@@ -986,6 +1074,12 @@ HITTING LEADERS ({chat_season}):
 
 PITCHING LEADERS ({chat_season}):
 {_pit_block}
+
+FIELDING / DEFENSE LEADERS ({chat_season}):
+{_fld_block}
+(E=errors, A=assists, PO=putouts, DP=double plays — counting totals across all positions.
+DRS=Defensive Runs Saved, OAA=Outs Above Average, UZR=Ultimate Zone Rating, Def=total
+defensive runs; higher is better for DRS/OAA/UZR/Def. More errors = worse defense.)
 
 For career totals, all-time/active leaders, awards, and Hall-of-Fame type questions, use your
 baseball knowledge. If a player's exact {chat_season} line is needed and provided below in a
@@ -1019,6 +1113,15 @@ baseball knowledge. If a player's exact {chat_season} line is needed and provide
             ks = [k for k in ["W","L","SV","IP","ERA","WHIP","K/9","K%","BB%","FIP","WAR"]
                   if k in r.index and pd.notna(r.get(k))]
             if ks: out.append("pitching " + ", ".join(f"{k}={_fmtnum(r[k])}" for k in ks))
+        if not fld_basic.empty and name in set(fld_basic["Name"]):
+            r = fld_basic[fld_basic["Name"] == name].iloc[0]
+            dparts = [f"{k}={_fmtnum(r[k])}" for k in ["E","A","PO","DP"]
+                      if k in r.index and pd.notna(r.get(k))]
+            if not fld_adv.empty and name in set(fld_adv["Name"]):
+                ra = fld_adv[fld_adv["Name"] == name].iloc[0]
+                dparts += [f"{k}={_fmtnum(ra[k])}" for k in ["DRS","OAA","UZR","Def"]
+                           if k in ra.index and pd.notna(ra.get(k))]
+            if dparts: out.append("fielding " + ", ".join(dparts))
         return f"{name} ({chat_season}): " + " | ".join(out) if out else ""
 
     def _find_mentioned_players(msg):
@@ -1026,6 +1129,7 @@ baseball knowledge. If a player's exact {chat_season} line is needed and provide
         names = set()
         if not hit_fg.empty: names |= set(hit_fg["Name"].dropna())
         if not pit_fg.empty: names |= set(pit_fg["Name"].dropna())
+        if not fld_basic.empty: names |= set(fld_basic["Name"].dropna())
         found = []
         for name in names:
             toks = name.lower().split()
